@@ -17,3 +17,5 @@ worker/.dev.vars
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+!CLAUDE.md

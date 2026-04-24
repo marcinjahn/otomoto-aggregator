@@ -42,10 +42,11 @@ export async function scrape(
   const seen = new Set(first.offers.map((o) => o.id));
 
   opts.onProgress?.({
-    page: 1,
+    pagesCompleted: 1,
     totalPages,
     offersCollected: allOffers.length,
     totalOffers: first.totalCount,
+    done: totalPages <= 1,
   });
 
   if (totalPages <= 1) {
@@ -74,10 +75,11 @@ export async function scrape(
       }
       pagesDone++;
       opts.onProgress?.({
-        page,
+        pagesCompleted: pagesDone,
         totalPages,
         offersCollected: allOffers.length,
         totalOffers: first.totalCount,
+        done: pagesDone >= totalPages,
       });
     }
   };

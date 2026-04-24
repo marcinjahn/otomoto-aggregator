@@ -10,13 +10,18 @@
 		byGearbox,
 		byRegion,
 	} from "$lib/aggregations";
-	import type { ModelBucket } from "$lib/aggregations/types";
+	import type { FilterState, NumericRange } from "$lib/filters/types";
+	import {
+		emptyFilters,
+		hasAnyFilter,
+	} from "$lib/filters/types";
+	import { applyFilters, toggleRange, toggleSet } from "$lib/filters/apply";
 	import { PROXY_URL } from "$lib/config";
 	import { scrape, type Offer, type ScrapeProgress } from "$lib/scraper";
-	import ByModelGrid from "$lib/ui/ByModelGrid.svelte";
-	import CategoricalList from "$lib/ui/CategoricalList.svelte";
-	import HistogramBar from "$lib/ui/HistogramBar.svelte";
-	import ModelDrilldown from "$lib/ui/ModelDrilldown.svelte";
+	import CategoricalFilter from "$lib/ui/CategoricalFilter.svelte";
+	import HistogramFilter from "$lib/ui/HistogramFilter.svelte";
+	import ModelFilter from "$lib/ui/ModelFilter.svelte";
+	import OffersList from "$lib/ui/OffersList.svelte";
 	import PriceSummary from "$lib/ui/PriceSummary.svelte";
 
 	let url = $state("");
@@ -24,15 +29,16 @@
 	let error = $state<string | null>(null);
 	let progress = $state<ScrapeProgress | null>(null);
 	let offers = $state<Offer[] | null>(null);
-	let selectedModel = $state<ModelBucket | null>(null);
+	let filters = $state<FilterState>(emptyFilters());
 	let controller: AbortController | null = null;
 
 	const canSubmit = $derived(url.trim().length > 0 && !running && !!PROXY_URL);
 
-	const results = $derived(
+	// Aggregations run on the full (unfiltered) offer set so counts stay stable
+	// as the user narrows down.
+	const agg = $derived(
 		offers
 			? {
-					priceOverall: priceOverall.compute(offers),
 					byModel: byModel.compute(offers),
 					priceHist: priceHistogram.compute(offers),
 					yearHist: yearHistogram.compute(offers),
@@ -45,6 +51,10 @@
 			: null
 	);
 
+	// Filtered view (what the offers list shows + what the top summary reflects).
+	const filtered = $derived(offers ? applyFilters(offers, filters) : []);
+	const summary = $derived(priceOverall.compute(filtered));
+
 	async function run(e: Event) {
 		e.preventDefault();
 		if (!canSubmit) return;
@@ -52,7 +62,7 @@
 		error = null;
 		progress = null;
 		offers = null;
-		selectedModel = null;
+		filters = emptyFilters();
 		controller = new AbortController();
 		try {
 			const res = await scrape(url.trim(), {
@@ -74,14 +84,45 @@
 	function cancel() {
 		controller?.abort();
 	}
+
+	function clearFilters() {
+		filters = emptyFilters();
+	}
+
+	function toggleModel(k: string) {
+		filters = { ...filters, models: toggleSet(filters.models, k) };
+	}
+	function toggleMake(k: string) {
+		filters = { ...filters, makes: toggleSet(filters.makes, k) };
+	}
+	function toggleFuel(k: string) {
+		filters = { ...filters, fuelTypes: toggleSet(filters.fuelTypes, k) };
+	}
+	function toggleGearbox(k: string) {
+		filters = { ...filters, gearboxes: toggleSet(filters.gearboxes, k) };
+	}
+	function toggleRegion(k: string) {
+		filters = { ...filters, regions: toggleSet(filters.regions, k) };
+	}
+	function togglePriceRange(r: NumericRange) {
+		filters = { ...filters, priceRanges: toggleRange(filters.priceRanges, r) };
+	}
+	function toggleYearRange(r: NumericRange) {
+		filters = { ...filters, yearRanges: toggleRange(filters.yearRanges, r) };
+	}
+	function toggleMileageRange(r: NumericRange) {
+		filters = { ...filters, mileageRanges: toggleRange(filters.mileageRanges, r) };
+	}
 </script>
 
-<main class="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-4 py-8">
-	<header>
-		<h1 class="text-2xl font-bold tracking-tight">Otomoto Aggregator</h1>
-		<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-			Paste an Otomoto search URL and discover what's on offer.
-		</p>
+<div class="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-4 px-4 py-6">
+	<header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+		<div>
+			<h1 class="text-2xl font-bold tracking-tight">Otomoto Aggregator</h1>
+			<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+				Paste an Otomoto search URL and discover what's on offer.
+			</p>
+		</div>
 	</header>
 
 	<form class="flex flex-col gap-2 sm:flex-row" onsubmit={run}>
@@ -106,7 +147,7 @@
 				disabled={!canSubmit}
 				class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm enabled:hover:bg-blue-500 disabled:opacity-50"
 			>
-				Scrape
+				Discover
 			</button>
 		{/if}
 	</form>
@@ -118,16 +159,16 @@
 		</div>
 	{/if}
 
-	{#if progress}
+	{#if running && progress}
 		{@const pct =
 			progress.totalPages > 0
-				? (progress.page / progress.totalPages) * 100
+				? (progress.pagesCompleted / progress.totalPages) * 100
 				: 0}
 		<div class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
 			<div class="mb-1 flex justify-between text-xs text-neutral-600 dark:text-neutral-400">
 				<span>
-					Page {progress.page} of {progress.totalPages} ·
-					{progress.offersCollected} / {progress.totalOffers} offers
+					Page {progress.pagesCompleted} / {progress.totalPages} ·
+					{progress.offersCollected} offers so far
 				</span>
 				<span>{pct.toFixed(0)}%</span>
 			</div>
@@ -143,89 +184,124 @@
 		</div>
 	{/if}
 
-	{#if results}
-		<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-			<header>
-				<h2 class="text-lg font-semibold">{priceOverall.title}</h2>
-				<p class="text-xs text-neutral-500">{priceOverall.description}</p>
-			</header>
-			<PriceSummary result={results.priceOverall} />
-		</section>
+	{#if agg && offers}
+		<div class="grid gap-4 lg:grid-cols-[22rem_1fr]">
+			<aside class="flex flex-col gap-3">
+				{#if hasAnyFilter(filters)}
+					<button
+						type="button"
+						onclick={clearFilters}
+						class="self-start rounded border border-neutral-300 bg-white px-3 py-1 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+					>
+						Clear filters
+					</button>
+				{/if}
 
-		<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-			<header>
-				<h2 class="text-lg font-semibold">{byModel.title}</h2>
-				<p class="text-xs text-neutral-500">{byModel.description}</p>
-			</header>
-			<ByModelGrid result={results.byModel} onSelect={(m) => (selectedModel = m)} />
-		</section>
+				<section class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<h2 class="mb-2 text-sm font-semibold">{priceOverall.title}</h2>
+					<PriceSummary result={summary} />
+				</section>
 
-		<div class="grid gap-4 md:grid-cols-2">
-			<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-				<header>
-					<h2 class="text-base font-semibold">{priceHistogram.title}</h2>
-					<p class="text-xs text-neutral-500">{priceHistogram.description}</p>
-				</header>
-				<HistogramBar result={results.priceHist} />
-			</section>
+				<details open class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<summary class="cursor-pointer text-sm font-semibold">{byModel.title}</summary>
+					<div class="mt-3">
+						<ModelFilter
+							result={agg.byModel}
+							selected={filters.models}
+							onToggle={toggleModel}
+						/>
+					</div>
+				</details>
 
-			<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-				<header>
-					<h2 class="text-base font-semibold">{yearHistogram.title}</h2>
-					<p class="text-xs text-neutral-500">{yearHistogram.description}</p>
-				</header>
-				<HistogramBar result={results.yearHist} />
-			</section>
+				<details open class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<summary class="cursor-pointer text-sm font-semibold">{yearHistogram.title}</summary>
+					<div class="mt-3">
+						<HistogramFilter
+							result={agg.yearHist}
+							selected={filters.yearRanges}
+							onToggle={toggleYearRange}
+						/>
+					</div>
+				</details>
 
-			<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-				<header>
-					<h2 class="text-base font-semibold">{mileageHistogram.title}</h2>
-					<p class="text-xs text-neutral-500">{mileageHistogram.description}</p>
-				</header>
-				<HistogramBar result={results.mileageHist} />
-			</section>
+				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<summary class="cursor-pointer text-sm font-semibold">{priceHistogram.title}</summary>
+					<div class="mt-3">
+						<HistogramFilter
+							result={agg.priceHist}
+							selected={filters.priceRanges}
+							onToggle={togglePriceRange}
+						/>
+					</div>
+				</details>
 
-			<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-				<header>
-					<h2 class="text-base font-semibold">{byMake.title}</h2>
-					<p class="text-xs text-neutral-500">{byMake.description}</p>
-				</header>
-				<CategoricalList result={results.byMake} />
-			</section>
+				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<summary class="cursor-pointer text-sm font-semibold">{mileageHistogram.title}</summary>
+					<div class="mt-3">
+						<HistogramFilter
+							result={agg.mileageHist}
+							selected={filters.mileageRanges}
+							onToggle={toggleMileageRange}
+						/>
+					</div>
+				</details>
 
-			<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-				<header>
-					<h2 class="text-base font-semibold">{byFuelType.title}</h2>
-					<p class="text-xs text-neutral-500">{byFuelType.description}</p>
-				</header>
-				<CategoricalList result={results.byFuel} />
-			</section>
+				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<summary class="cursor-pointer text-sm font-semibold">{byMake.title}</summary>
+					<div class="mt-3">
+						<CategoricalFilter
+							result={agg.byMake}
+							selected={filters.makes}
+							onToggle={toggleMake}
+						/>
+					</div>
+				</details>
 
-			<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-				<header>
-					<h2 class="text-base font-semibold">{byGearbox.title}</h2>
-					<p class="text-xs text-neutral-500">{byGearbox.description}</p>
-				</header>
-				<CategoricalList result={results.byGearbox} />
-			</section>
+				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<summary class="cursor-pointer text-sm font-semibold">{byFuelType.title}</summary>
+					<div class="mt-3">
+						<CategoricalFilter
+							result={agg.byFuel}
+							selected={filters.fuelTypes}
+							onToggle={toggleFuel}
+						/>
+					</div>
+				</details>
 
-			<section class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 md:col-span-2">
-				<header>
-					<h2 class="text-base font-semibold">{byRegion.title}</h2>
-					<p class="text-xs text-neutral-500">{byRegion.description}</p>
-				</header>
-				<CategoricalList result={results.byRegion} />
+				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<summary class="cursor-pointer text-sm font-semibold">{byGearbox.title}</summary>
+					<div class="mt-3">
+						<CategoricalFilter
+							result={agg.byGearbox}
+							selected={filters.gearboxes}
+							onToggle={toggleGearbox}
+						/>
+					</div>
+				</details>
+
+				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<summary class="cursor-pointer text-sm font-semibold">{byRegion.title}</summary>
+					<div class="mt-3">
+						<CategoricalFilter
+							result={agg.byRegion}
+							selected={filters.regions}
+							onToggle={toggleRegion}
+						/>
+					</div>
+				</details>
+			</aside>
+
+			<section class="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+				<div class="max-h-[calc(100vh-8rem)] overflow-y-auto">
+					<OffersList offers={filtered} totalUnfiltered={offers.length} />
+				</div>
 			</section>
 		</div>
-	{:else if !progress && !error}
+	{:else if !running && !error}
 		<section
 			class="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700"
 		>
-			Paste an Otomoto search URL above and hit Scrape.
+			Paste an Otomoto search URL above and hit Discover.
 		</section>
 	{/if}
-
-	{#if selectedModel}
-		<ModelDrilldown bucket={selectedModel} onClose={() => (selectedModel = null)} />
-	{/if}
-</main>
+</div>

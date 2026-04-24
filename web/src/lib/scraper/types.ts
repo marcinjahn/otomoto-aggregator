@@ -25,10 +25,11 @@ export interface Offer {
 }
 
 export interface ScrapeProgress {
-  page: number;
+  pagesCompleted: number;
   totalPages: number;
   offersCollected: number;
   totalOffers: number;
+  done: boolean;
 }
 
 export interface ScrapeResult {

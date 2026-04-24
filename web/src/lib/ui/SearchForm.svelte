@@ -417,6 +417,17 @@
 
 		<div>
 			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
+				Stan
+			</div>
+			<ChipGroup
+				options={FILTERS.enums["filter_enum_damaged"] ?? []}
+				selected={state.enums["filter_enum_damaged"] ?? []}
+				onToggle={(v) => toggleEnum("filter_enum_damaged", v)}
+			/>
+		</div>
+
+		<div>
+			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
 				Kraj pochodzenia
 			</div>
 			<ChipGroup

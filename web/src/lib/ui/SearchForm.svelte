@@ -36,9 +36,27 @@
 		onChange?.(url, state);
 	});
 
-	const priceSteps = $derived(FILTERS.ranges["filter_float_price"]!.suggestions);
-	const yearSteps = $derived(FILTERS.ranges["filter_float_year"]!.suggestions);
-	const mileageSteps = $derived(FILTERS.ranges["filter_float_mileage"]!.suggestions);
+	// Otomoto's suggestion ladders are too sparse for comfortable slider use
+	// (e.g. price jumps 65k→80k→100k→200k). Expand to uniform increments;
+	// otomoto accepts any integer within the min/max range.
+	function uniformSteps(min: number, max: number, step: number): number[] {
+		const out: number[] = [];
+		const start = Math.max(min, Math.ceil(min / step) * step);
+		for (let v = start; v <= max; v += step) out.push(v);
+		if (out[0] !== min) out.unshift(min);
+		if (out[out.length - 1] !== max) out.push(max);
+		return out;
+	}
+
+	const priceRange = FILTERS.ranges["filter_float_price"]!;
+	const mileageRange = FILTERS.ranges["filter_float_mileage"]!;
+	const priceSteps = $derived(uniformSteps(priceRange.min, priceRange.max, 1000));
+	const yearSteps = $derived(
+		FILTERS.ranges["filter_float_year"]!.suggestions.filter((y) => y >= 1990),
+	);
+	const mileageSteps = $derived(
+		uniformSteps(mileageRange.min, mileageRange.max, 5000),
+	);
 	const capacitySteps = $derived(
 		FILTERS.ranges["filter_float_engine_capacity"]!.suggestions,
 	);

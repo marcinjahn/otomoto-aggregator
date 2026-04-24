@@ -1,4 +1,4 @@
-const CACHE_KEY = "otomoto-agg:model-photos:v1";
+const CACHE_KEY = "otomoto-agg:model-photos:v2";
 const NEGATIVE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const POSITIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -61,7 +61,7 @@ async function queryWikipedia(
   url.searchParams.set("gsrlimit", "1");
   url.searchParams.set("prop", "pageimages");
   url.searchParams.set("piprop", "thumbnail");
-  url.searchParams.set("pithumbsize", "480");
+  url.searchParams.set("pithumbsize", "900");
   url.searchParams.set("origin", "*");
 
   const res = await fetch(url.toString());

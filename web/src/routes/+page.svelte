@@ -11,18 +11,17 @@
 		byRegion,
 	} from "$lib/aggregations";
 	import type { FilterState, NumericRange } from "$lib/filters/types";
-	import {
-		emptyFilters,
-		hasAnyFilter,
-	} from "$lib/filters/types";
+	import { emptyFilters, hasAnyFilter } from "$lib/filters/types";
 	import { applyFilters, toggleRange, toggleSet } from "$lib/filters/apply";
 	import { PROXY_URL } from "$lib/config";
 	import { scrape, type Offer, type ScrapeProgress } from "$lib/scraper";
 	import CategoricalFilter from "$lib/ui/CategoricalFilter.svelte";
+	import FilterSection from "$lib/ui/FilterSection.svelte";
 	import HistogramFilter from "$lib/ui/HistogramFilter.svelte";
 	import ModelFilter from "$lib/ui/ModelFilter.svelte";
 	import OffersList from "$lib/ui/OffersList.svelte";
 	import PriceSummary from "$lib/ui/PriceSummary.svelte";
+	import ThemeSwitch from "$lib/ui/ThemeSwitch.svelte";
 
 	let url = $state("");
 	let running = $state(false);
@@ -34,8 +33,6 @@
 
 	const canSubmit = $derived(url.trim().length > 0 && !running && !!PROXY_URL);
 
-	// Aggregations run on the full (unfiltered) offer set so counts stay stable
-	// as the user narrows down.
 	const agg = $derived(
 		offers
 			? {
@@ -51,7 +48,6 @@
 			: null
 	);
 
-	// Filtered view (what the offers list shows + what the top summary reflects).
 	const filtered = $derived(offers ? applyFilters(offers, filters) : []);
 	const summary = $derived(priceOverall.compute(filtered));
 
@@ -111,11 +107,14 @@
 		filters = { ...filters, yearRanges: toggleRange(filters.yearRanges, r) };
 	}
 	function toggleMileageRange(r: NumericRange) {
-		filters = { ...filters, mileageRanges: toggleRange(filters.mileageRanges, r) };
+		filters = {
+			...filters,
+			mileageRanges: toggleRange(filters.mileageRanges, r),
+		};
 	}
 </script>
 
-<div class="mx-auto flex min-h-screen max-w-[1400px] flex-col gap-4 px-4 py-6">
+<div class="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-6">
 	<header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
 		<div>
 			<h1 class="text-2xl font-bold tracking-tight">Otomoto Aggregator</h1>
@@ -123,6 +122,7 @@
 				Paste an Otomoto search URL and discover what's on offer.
 			</p>
 		</div>
+		<ThemeSwitch />
 	</header>
 
 	<form class="flex flex-col gap-2 sm:flex-row" onsubmit={run}>
@@ -173,7 +173,10 @@
 				<span>{pct.toFixed(0)}%</span>
 			</div>
 			<div class="h-2 rounded bg-neutral-200 dark:bg-neutral-800">
-				<div class="h-2 rounded bg-blue-500 transition-all" style="width: {pct}%"></div>
+				<div
+					class="h-2 rounded bg-blue-500 transition-all"
+					style="width: {pct}%"
+				></div>
 			</div>
 		</div>
 	{/if}
@@ -185,7 +188,7 @@
 	{/if}
 
 	{#if agg && offers}
-		<div class="grid gap-4 lg:grid-cols-[22rem_1fr]">
+		<div class="grid items-start gap-4 lg:grid-cols-[22rem_1fr]">
 			<aside class="flex flex-col gap-3">
 				{#if hasAnyFilter(filters)}
 					<button
@@ -193,7 +196,7 @@
 						onclick={clearFilters}
 						class="self-start rounded border border-neutral-300 bg-white px-3 py-1 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
 					>
-						Clear filters
+						Clear all filters
 					</button>
 				{/if}
 
@@ -202,105 +205,111 @@
 					<PriceSummary result={summary} />
 				</section>
 
-				<details open class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-					<summary class="cursor-pointer text-sm font-semibold">{byModel.title}</summary>
-					<div class="mt-3">
-						<ModelFilter
-							result={agg.byModel}
-							selected={filters.models}
-							onToggle={toggleModel}
-						/>
-					</div>
-				</details>
+				<FilterSection
+					title={byModel.title}
+					active={filters.models.size > 0}
+					onClear={() => (filters = { ...filters, models: new Set() })}
+					open
+				>
+					<ModelFilter
+						result={agg.byModel}
+						selected={filters.models}
+						onToggle={toggleModel}
+					/>
+				</FilterSection>
 
-				<details open class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-					<summary class="cursor-pointer text-sm font-semibold">{yearHistogram.title}</summary>
-					<div class="mt-3">
-						<HistogramFilter
-							result={agg.yearHist}
-							selected={filters.yearRanges}
-							onToggle={toggleYearRange}
-						/>
-					</div>
-				</details>
+				<FilterSection
+					title={yearHistogram.title}
+					active={filters.yearRanges.length > 0}
+					onClear={() => (filters = { ...filters, yearRanges: [] })}
+					open
+				>
+					<HistogramFilter
+						result={agg.yearHist}
+						selected={filters.yearRanges}
+						onToggle={toggleYearRange}
+					/>
+				</FilterSection>
 
-				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-					<summary class="cursor-pointer text-sm font-semibold">{priceHistogram.title}</summary>
-					<div class="mt-3">
-						<HistogramFilter
-							result={agg.priceHist}
-							selected={filters.priceRanges}
-							onToggle={togglePriceRange}
-						/>
-					</div>
-				</details>
+				<FilterSection
+					title={priceHistogram.title}
+					active={filters.priceRanges.length > 0}
+					onClear={() => (filters = { ...filters, priceRanges: [] })}
+				>
+					<HistogramFilter
+						result={agg.priceHist}
+						selected={filters.priceRanges}
+						onToggle={togglePriceRange}
+					/>
+				</FilterSection>
 
-				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-					<summary class="cursor-pointer text-sm font-semibold">{mileageHistogram.title}</summary>
-					<div class="mt-3">
-						<HistogramFilter
-							result={agg.mileageHist}
-							selected={filters.mileageRanges}
-							onToggle={toggleMileageRange}
-						/>
-					</div>
-				</details>
+				<FilterSection
+					title={mileageHistogram.title}
+					active={filters.mileageRanges.length > 0}
+					onClear={() => (filters = { ...filters, mileageRanges: [] })}
+				>
+					<HistogramFilter
+						result={agg.mileageHist}
+						selected={filters.mileageRanges}
+						onToggle={toggleMileageRange}
+					/>
+				</FilterSection>
 
-				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-					<summary class="cursor-pointer text-sm font-semibold">{byMake.title}</summary>
-					<div class="mt-3">
-						<CategoricalFilter
-							result={agg.byMake}
-							selected={filters.makes}
-							onToggle={toggleMake}
-						/>
-					</div>
-				</details>
+				<FilterSection
+					title={byMake.title}
+					active={filters.makes.size > 0}
+					onClear={() => (filters = { ...filters, makes: new Set() })}
+				>
+					<CategoricalFilter
+						result={agg.byMake}
+						selected={filters.makes}
+						onToggle={toggleMake}
+					/>
+				</FilterSection>
 
-				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-					<summary class="cursor-pointer text-sm font-semibold">{byFuelType.title}</summary>
-					<div class="mt-3">
-						<CategoricalFilter
-							result={agg.byFuel}
-							selected={filters.fuelTypes}
-							onToggle={toggleFuel}
-						/>
-					</div>
-				</details>
+				<FilterSection
+					title={byFuelType.title}
+					active={filters.fuelTypes.size > 0}
+					onClear={() => (filters = { ...filters, fuelTypes: new Set() })}
+				>
+					<CategoricalFilter
+						result={agg.byFuel}
+						selected={filters.fuelTypes}
+						onToggle={toggleFuel}
+					/>
+				</FilterSection>
 
-				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-					<summary class="cursor-pointer text-sm font-semibold">{byGearbox.title}</summary>
-					<div class="mt-3">
-						<CategoricalFilter
-							result={agg.byGearbox}
-							selected={filters.gearboxes}
-							onToggle={toggleGearbox}
-						/>
-					</div>
-				</details>
+				<FilterSection
+					title={byGearbox.title}
+					active={filters.gearboxes.size > 0}
+					onClear={() => (filters = { ...filters, gearboxes: new Set() })}
+				>
+					<CategoricalFilter
+						result={agg.byGearbox}
+						selected={filters.gearboxes}
+						onToggle={toggleGearbox}
+					/>
+				</FilterSection>
 
-				<details class="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-					<summary class="cursor-pointer text-sm font-semibold">{byRegion.title}</summary>
-					<div class="mt-3">
-						<CategoricalFilter
-							result={agg.byRegion}
-							selected={filters.regions}
-							onToggle={toggleRegion}
-						/>
-					</div>
-				</details>
+				<FilterSection
+					title={byRegion.title}
+					active={filters.regions.size > 0}
+					onClear={() => (filters = { ...filters, regions: new Set() })}
+				>
+					<CategoricalFilter
+						result={agg.byRegion}
+						selected={filters.regions}
+						onToggle={toggleRegion}
+					/>
+				</FilterSection>
 			</aside>
 
-			<section class="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-				<div class="max-h-[calc(100vh-8rem)] overflow-y-auto">
-					<OffersList offers={filtered} totalUnfiltered={offers.length} />
-				</div>
+			<section class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+				<OffersList offers={filtered} totalUnfiltered={offers.length} />
 			</section>
 		</div>
 	{:else if !running && !error}
-		<section
-			class="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700"
-		>
+		<section class="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
 			Paste an Otomoto search URL above and hit Discover.
 		</section>
 	{/if}

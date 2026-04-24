@@ -22,6 +22,10 @@ export interface Offer {
   engineCapacityCm3: number | null;
   enginePowerHp: number | null;
   createdAt: string | null;
+  // Populated by the enrichment pass (detail-page fetch), null otherwise.
+  generation: string | null;
+  generationCode: string | null;
+  generationStartYear: number | null;
 }
 
 export interface ScrapeProgress {

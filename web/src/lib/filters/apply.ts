@@ -1,6 +1,6 @@
 import type { Offer } from "../scraper/types";
 import type { FilterState, NumericRange } from "./types";
-import { modelKey } from "./types";
+import { generationKey, modelKey, NO_GEN_CODE } from "./types";
 
 function inAnyRange(v: number | null, ranges: NumericRange[]): boolean {
   if (ranges.length === 0) return true;
@@ -21,11 +21,17 @@ export function applyFilters(
   offers: readonly Offer[],
   f: FilterState,
 ): Offer[] {
+  const anyModelSelection = f.models.size > 0 || f.generations.size > 0;
   const out: Offer[] = [];
   for (const o of offers) {
-    if (f.models.size > 0) {
+    if (anyModelSelection) {
       if (!o.make || !o.model) continue;
-      if (!f.models.has(modelKey(o.make, o.model))) continue;
+      const mk = modelKey(o.make, o.model);
+      const genCode = o.generationCode ?? NO_GEN_CODE;
+      const gk = generationKey(o.make, o.model, genCode);
+      const modelOk = f.models.has(mk);
+      const genOk = f.generations.has(gk);
+      if (!modelOk && !genOk) continue;
     }
     if (!inSet(o.make, f.makes)) continue;
     if (!inSet(o.fuelType, f.fuelTypes)) continue;
@@ -58,5 +64,11 @@ export function toggleSet<T>(set: Set<T>, value: T): Set<T> {
   const next = new Set(set);
   if (next.has(value)) next.delete(value);
   else next.add(value);
+  return next;
+}
+
+export function removeFromSet<T>(set: Set<T>, values: Iterable<T>): Set<T> {
+  const next = new Set(set);
+  for (const v of values) next.delete(v);
   return next;
 }

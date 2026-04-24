@@ -4,6 +4,13 @@ import { ScrapeError } from "./types";
 
 export type { Offer, ScrapeProgress, ScrapeResult } from "./types";
 export { ScrapeError } from "./types";
+export {
+  enrichAll,
+  enrichOffer,
+  extractEnrichedFields,
+  type EnrichProgress,
+  type EnrichedFields,
+} from "./enrich";
 
 export interface ScrapeOptions {
   /** Proxy endpoint that accepts `?url=<encoded target>` and returns upstream body. */

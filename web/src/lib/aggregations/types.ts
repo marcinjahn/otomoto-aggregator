@@ -12,6 +12,18 @@ export interface Range {
   max: number;
 }
 
+export interface GenerationBucket {
+  /** Raw otomoto generation code, or `__nogen__` when offers have no generation metadata. */
+  code: string;
+  /** Human-readable label. `(No generation)` for the nogen bucket. */
+  display: string;
+  startYear: number | null;
+  count: number;
+  priceRange: Range | null;
+  yearRange: Range | null;
+  sampleThumbnail: string | null;
+}
+
 export interface ModelBucket {
   make: string;
   makeDisplay: string;
@@ -28,6 +40,8 @@ export interface ModelBucket {
   gearboxMix: Record<string, number>;
   sampleThumbnail: string | null;
   offers: Offer[];
+  /** Generation breakdown ordered by startYear desc then count desc. Always has at least 1 entry. */
+  generations: GenerationBucket[];
 }
 
 export interface ByModelResult {

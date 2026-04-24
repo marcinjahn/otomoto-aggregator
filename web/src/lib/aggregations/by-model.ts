@@ -1,5 +1,11 @@
 import type { Offer } from "../scraper/types";
-import type { Aggregator, ByModelResult, ModelBucket } from "./types";
+import { NO_GEN_CODE } from "../filters/types";
+import type {
+  Aggregator,
+  ByModelResult,
+  GenerationBucket,
+  ModelBucket,
+} from "./types";
 import { median, minMax } from "./stats";
 
 function key(o: Offer): string | null {
@@ -88,5 +94,54 @@ function buildBucket(list: Offer[]): ModelBucket {
     gearboxMix,
     sampleThumbnail,
     offers: list,
+    generations: buildGenerations(list),
   };
+}
+
+function buildGenerations(list: Offer[]): GenerationBucket[] {
+  const grouped = new Map<string, Offer[]>();
+  for (const o of list) {
+    const code = o.generationCode ?? NO_GEN_CODE;
+    let arr = grouped.get(code);
+    if (!arr) {
+      arr = [];
+      grouped.set(code, arr);
+    }
+    arr.push(o);
+  }
+
+  const buckets: GenerationBucket[] = [];
+  for (const [code, offers] of grouped) {
+    const first = offers[0]!;
+    const prices = offers
+      .map((o) => o.priceAmount)
+      .filter((v): v is number => v != null);
+    const years = offers
+      .map((o) => o.year)
+      .filter((v): v is number => v != null);
+    let sample: string | null = null;
+    for (const o of offers) {
+      if (!sample && (o.thumbnailLarge ?? o.thumbnailSmall)) {
+        sample = o.thumbnailLarge ?? o.thumbnailSmall;
+        break;
+      }
+    }
+    const isNoGen = code === NO_GEN_CODE;
+    buckets.push({
+      code,
+      display: isNoGen ? "(No generation)" : (first.generation ?? code),
+      startYear: isNoGen ? null : (first.generationStartYear ?? null),
+      count: offers.length,
+      priceRange: minMax(prices),
+      yearRange: minMax(years),
+      sampleThumbnail: sample,
+    });
+  }
+  buckets.sort((a, b) => {
+    const aYear = a.startYear ?? -Infinity;
+    const bYear = b.startYear ?? -Infinity;
+    if (aYear !== bYear) return bYear - aYear;
+    return b.count - a.count;
+  });
+  return buckets;
 }

@@ -11,10 +11,26 @@
 		byRegion,
 	} from "$lib/aggregations";
 	import type { FilterState, NumericRange } from "$lib/filters/types";
-	import { emptyFilters, hasAnyFilter } from "$lib/filters/types";
-	import { applyFilters, toggleRange, toggleSet } from "$lib/filters/apply";
+	import {
+		emptyFilters,
+		generationKey,
+		hasAnyFilter,
+		modelKey,
+	} from "$lib/filters/types";
+	import {
+		applyFilters,
+		removeFromSet,
+		toggleRange,
+		toggleSet,
+	} from "$lib/filters/apply";
 	import { PROXY_URL } from "$lib/config";
-	import { scrape, type Offer, type ScrapeProgress } from "$lib/scraper";
+	import {
+		enrichAll,
+		scrape,
+		type EnrichProgress,
+		type Offer,
+		type ScrapeProgress,
+	} from "$lib/scraper";
 	import CategoricalFilter from "$lib/ui/CategoricalFilter.svelte";
 	import FilterSection from "$lib/ui/FilterSection.svelte";
 	import HistogramFilter from "$lib/ui/HistogramFilter.svelte";
@@ -25,8 +41,10 @@
 
 	let url = $state("");
 	let running = $state(false);
+	let enriching = $state(false);
 	let error = $state<string | null>(null);
 	let progress = $state<ScrapeProgress | null>(null);
+	let enrichProgress = $state<EnrichProgress | null>(null);
 	let offers = $state<Offer[] | null>(null);
 	let filters = $state<FilterState>(emptyFilters());
 	let controller: AbortController | null = null;
@@ -55,8 +73,10 @@
 		e.preventDefault();
 		if (!canSubmit) return;
 		running = true;
+		enriching = false;
 		error = null;
 		progress = null;
+		enrichProgress = null;
 		offers = null;
 		filters = emptyFilters();
 		controller = new AbortController();
@@ -67,12 +87,33 @@
 				onProgress: (p) => (progress = p),
 			});
 			offers = res.offers;
+			running = false;
+			if (res.offers.length > 0 && !controller.signal.aborted) {
+				enriching = true;
+				enrichProgress = { enriched: 0, total: res.offers.length, failed: 0 };
+				await enrichAll(res.offers, {
+					proxyUrl: PROXY_URL!,
+					signal: controller.signal,
+					onProgress: (p) => (enrichProgress = p),
+					onOffer: (offerId, fields) => {
+						// Mutate the offer in state so aggregations recompute reactively.
+						const arr = offers;
+						if (!arr) return;
+						const idx = arr.findIndex((o) => o.id === offerId);
+						if (idx < 0) return;
+						const next = [...arr];
+						next[idx] = { ...arr[idx]!, ...fields };
+						offers = next;
+					},
+				});
+			}
 		} catch (e) {
 			if ((e as Error).name !== "AbortError") {
 				error = (e as Error).message;
 			}
 		} finally {
 			running = false;
+			enriching = false;
 			controller = null;
 		}
 	}
@@ -86,7 +127,30 @@
 	}
 
 	function toggleModel(k: string) {
-		filters = { ...filters, models: toggleSet(filters.models, k) };
+		// Clearing any per-generation selections for this model keeps the state
+		// tidy when the user flips back to the whole-model view.
+		const relatedGens = [...filters.generations].filter((g) =>
+			g.startsWith(`${k}__`)
+		);
+		filters = {
+			...filters,
+			models: toggleSet(filters.models, k),
+			generations: relatedGens.length
+				? removeFromSet(filters.generations, relatedGens)
+				: filters.generations,
+		};
+	}
+	function toggleGeneration(make: string, model: string, genCode: string) {
+		const mk = modelKey(make, model);
+		const gk = generationKey(make, model, genCode);
+		const nextModels = filters.models.has(mk)
+			? removeFromSet(filters.models, [mk])
+			: filters.models;
+		filters = {
+			...filters,
+			models: nextModels,
+			generations: toggleSet(filters.generations, gk),
+		};
 	}
 	function toggleMake(k: string) {
 		filters = { ...filters, makes: toggleSet(filters.makes, k) };
@@ -135,13 +199,13 @@
 			required
 			class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-neutral-700 dark:bg-neutral-900"
 		/>
-		{#if running}
+		{#if running || enriching}
 			<button
 				type="button"
 				onclick={cancel}
 				class="rounded-md bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-300 dark:bg-neutral-800 dark:text-neutral-100"
 			>
-				Cancel
+				{enriching ? "Stop enriching" : "Cancel"}
 			</button>
 		{:else}
 			<button
@@ -183,6 +247,28 @@
 		</div>
 	{/if}
 
+	{#if enriching && enrichProgress}
+		{@const pct2 =
+			enrichProgress.total > 0
+				? (enrichProgress.enriched / enrichProgress.total) * 100
+				: 0}
+		<div class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+			<div class="mb-1 flex justify-between text-xs text-neutral-600 dark:text-neutral-400">
+				<span>
+					Fetching generation info · {enrichProgress.enriched} /
+					{enrichProgress.total}
+				</span>
+				<span>{pct2.toFixed(0)}%</span>
+			</div>
+			<div class="h-1.5 rounded bg-neutral-200 dark:bg-neutral-800">
+				<div
+					class="h-1.5 rounded bg-emerald-500 transition-all"
+					style="width: {pct2}%"
+				></div>
+			</div>
+		</div>
+	{/if}
+
 	{#if error}
 		<div class="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
 			{error}
@@ -209,14 +295,21 @@
 
 				<FilterSection
 					title={byModel.title}
-					active={filters.models.size > 0}
-					onClear={() => (filters = { ...filters, models: new Set() })}
+					active={filters.models.size > 0 || filters.generations.size > 0}
+					onClear={() =>
+						(filters = {
+							...filters,
+							models: new Set(),
+							generations: new Set(),
+						})}
 					open
 				>
 					<ModelFilter
 						result={agg.byModel}
-						selected={filters.models}
-						onToggle={toggleModel}
+						selectedModels={filters.models}
+						selectedGenerations={filters.generations}
+						onToggleModel={toggleModel}
+						onToggleGeneration={toggleGeneration}
 					/>
 				</FilterSection>
 

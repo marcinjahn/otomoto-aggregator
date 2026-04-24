@@ -113,6 +113,9 @@ function nodeToOffer(node: RawNode): Offer {
     engineCapacityCm3: toInt(params.get("engine_capacity")?.value),
     enginePowerHp: toInt(params.get("engine_power")?.value),
     createdAt: node.createdAt ?? null,
+    generation: null,
+    generationCode: null,
+    generationStartYear: null,
   };
 }
 

@@ -47,7 +47,20 @@
 	let enrichProgress = $state<EnrichProgress | null>(null);
 	let offers = $state<Offer[] | null>(null);
 	let filters = $state<FilterState>(emptyFilters());
+	let mobileFiltersOpen = $state(false);
 	let controller: AbortController | null = null;
+
+	const activeFilterCount = $derived(
+		filters.models.size +
+			filters.generations.size +
+			filters.makes.size +
+			filters.fuelTypes.size +
+			filters.gearboxes.size +
+			filters.regions.size +
+			filters.priceRanges.length +
+			filters.yearRanges.length +
+			filters.mileageRanges.length
+	);
 
 	const canSubmit = $derived(url.trim().length > 0 && !running && !!PROXY_URL);
 
@@ -276,8 +289,44 @@
 	{/if}
 
 	{#if agg && offers}
+		<!-- Mobile-only filters trigger -->
+		<div class="sticky top-0 z-20 -mx-3 flex items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4 lg:hidden dark:border-neutral-800 dark:bg-neutral-950/95">
+			<button
+				type="button"
+				onclick={() => (mobileFiltersOpen = true)}
+				class="inline-flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium shadow-sm dark:border-neutral-700 dark:bg-neutral-900"
+			>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
+					<path d="M3 6h18" /><path d="M6 12h12" /><path d="M10 18h4" />
+				</svg>
+				<span>Filters</span>
+				{#if activeFilterCount > 0}
+					<span class="rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">
+						{activeFilterCount}
+					</span>
+				{/if}
+			</button>
+			<span class="text-xs text-neutral-500">
+				{filtered.length} / {offers.length} offers
+			</span>
+		</div>
+
 		<div class="grid items-start gap-4 lg:grid-cols-[22rem_1fr]">
-			<aside class="flex flex-col gap-3">
+			<aside
+				class={mobileFiltersOpen
+					? "fixed inset-0 z-50 flex flex-col gap-3 overflow-y-auto bg-neutral-50 p-4 dark:bg-neutral-950 lg:static lg:z-auto lg:overflow-visible lg:bg-transparent lg:p-0"
+					: "hidden flex-col gap-3 lg:static lg:flex lg:bg-transparent lg:p-0"}
+			>
+				<div class="flex items-center justify-between lg:hidden">
+					<h2 class="text-base font-semibold">Filters</h2>
+					<button
+						type="button"
+						onclick={() => (mobileFiltersOpen = false)}
+						class="rounded border border-neutral-300 bg-white px-3 py-1 text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900"
+					>
+						Done
+					</button>
+				</div>
 				{#if hasAnyFilter(filters)}
 					<button
 						type="button"

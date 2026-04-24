@@ -46,31 +46,45 @@
 		FILTERS.ranges["filter_float_engine_power"]!.suggestions,
 	);
 
-	const availableModels = $derived.by(() => {
+	const makeNameById = $derived(
+		Object.fromEntries(FILTERS.makes.map((m) => [m.id, m.name])) as Record<string, string>,
+	);
+
+	// Group models/generations by make (and model for generations) so users can
+	// tell which chip belongs to which make when multiple makes are selected.
+	// Model/generation filter URLs use the id alone, so toggling shared ids
+	// (e.g. "other") across makes is intentionally a single action.
+	const modelsByMake = $derived.by(() => {
 		if (!state.makes.length) return [];
-		const seen = new Set<string>();
-		const out: { id: string; name: string; make: string }[] = [];
+		const out: { makeId: string; makeName: string; models: { id: string; name: string }[] }[] = [];
 		for (const mk of state.makes) {
-			for (const m of FILTERS.models[mk] ?? []) {
-				const key = mk + "|" + m.id;
-				if (seen.has(key)) continue;
-				seen.add(key);
-				out.push({ id: m.id, name: m.name, make: mk });
-			}
+			const models = FILTERS.models[mk] ?? [];
+			if (!models.length) continue;
+			out.push({ makeId: mk, makeName: makeNameById[mk] ?? mk, models });
 		}
 		return out;
 	});
 
-	const availableGenerations = $derived.by(() => {
+	const generationsByMakeModel = $derived.by(() => {
 		if (!state.models.length) return [];
-		const out: { id: string; name: string; make: string; model: string }[] = [];
+		const out: {
+			key: string;
+			makeName: string;
+			modelName: string;
+			generations: { id: string; name: string }[];
+		}[] = [];
 		for (const mk of state.makes) {
 			for (const md of state.models) {
 				const gens = FILTERS.generations[genKey(mk, md)];
-				if (!gens) continue;
-				for (const g of gens) {
-					out.push({ id: g.id, name: g.name, make: mk, model: md });
-				}
+				if (!gens?.length) continue;
+				const modelName =
+					(FILTERS.models[mk] ?? []).find((m) => m.id === md)?.name ?? md;
+				out.push({
+					key: genKey(mk, md),
+					makeName: makeNameById[mk] ?? mk,
+					modelName,
+					generations: gens,
+				});
 			}
 		}
 		return out;
@@ -209,31 +223,51 @@
 				/>
 			</div>
 
-			{#if state.makes.length > 0 && availableModels.length > 0}
+			{#if modelsByMake.length > 0}
 				<div>
 					<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
 						Model
 					</div>
-					<ChipGroup
-						options={availableModels}
-						selected={state.models}
-						onToggle={toggleModel}
-						ariaLabel="Modele"
-					/>
+					<div class="flex flex-col gap-3">
+						{#each modelsByMake as grp (grp.makeId)}
+							<div>
+								{#if modelsByMake.length > 1}
+									<div class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+										{grp.makeName}
+									</div>
+								{/if}
+								<ChipGroup
+									options={grp.models}
+									selected={state.models}
+									onToggle={toggleModel}
+									ariaLabel="Modele {grp.makeName}"
+								/>
+							</div>
+						{/each}
+					</div>
 				</div>
 			{/if}
 
-			{#if state.models.length > 0 && availableGenerations.length > 0}
+			{#if generationsByMakeModel.length > 0}
 				<div>
 					<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
 						Generacja
 					</div>
-					<ChipGroup
-						options={availableGenerations}
-						selected={state.generations}
-						onToggle={toggleGeneration}
-						ariaLabel="Generacje"
-					/>
+					<div class="flex flex-col gap-3">
+						{#each generationsByMakeModel as grp (grp.key)}
+							<div>
+								<div class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+									{#if modelsByMake.length > 1}{grp.makeName} · {/if}{grp.modelName}
+								</div>
+								<ChipGroup
+									options={grp.generations}
+									selected={state.generations}
+									onToggle={toggleGeneration}
+									ariaLabel="Generacje {grp.modelName}"
+								/>
+							</div>
+						{/each}
+					</div>
 				</div>
 			{/if}
 		</div>

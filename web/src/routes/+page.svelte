@@ -41,6 +41,8 @@
 	import ThemeSwitch from "$lib/ui/ThemeSwitch.svelte";
 	import { parseOtomotoUrl } from "$lib/otomoto-filters/build-url";
 	import { emptyForm, type SearchFormState } from "$lib/otomoto-filters/types";
+	import { replaceState } from "$app/navigation";
+	import { page } from "$app/state";
 	import { onMount } from "svelte";
 
 	let url = $state("");
@@ -67,10 +69,10 @@
 
 	function syncPageUrl(targetUrl: string | null) {
 		if (typeof window === "undefined") return;
-		const u = new URL(window.location.href);
+		const u = new URL(page.url);
 		if (targetUrl) u.searchParams.set("q", targetUrl);
 		else u.searchParams.delete("q");
-		window.history.replaceState(null, "", u.toString());
+		replaceState(u, page.state);
 	}
 
 	const activeFilterCount = $derived(

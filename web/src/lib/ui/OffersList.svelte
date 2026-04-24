@@ -49,18 +49,19 @@
 </script>
 
 <div class="flex flex-col">
-	<div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-neutral-200 bg-white/90 px-3 py-2 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/90">
-		<p class="text-sm text-neutral-600 dark:text-neutral-400">
+	<div class="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-neutral-200 bg-white/90 px-3 py-2 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/90">
+		<p class="truncate text-sm text-neutral-600 dark:text-neutral-400">
 			<span class="font-semibold text-neutral-900 dark:text-neutral-100">
 				{formatInt(offers.length)}
 			</span>
-			/ {formatInt(totalUnfiltered)} offers
+			/ {formatInt(totalUnfiltered)}
 		</p>
-		<label class="flex items-center gap-2 text-xs">
-			<span class="text-neutral-500">Sort by</span>
+		<label class="flex items-center gap-1 text-xs">
+			<span class="hidden text-neutral-500 sm:inline">Sort</span>
 			<select
 				bind:value={sort}
-				class="rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-800"
+				aria-label="Sort offers"
+				class="max-w-[10rem] rounded border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-800"
 			>
 				<option value="price-asc">Price ↑</option>
 				<option value="price-desc">Price ↓</option>
@@ -81,7 +82,7 @@
 					rel="noopener noreferrer"
 					class="flex gap-3 p-3 transition hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
 				>
-					<div class="h-28 w-40 shrink-0 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 sm:h-32 sm:w-48">
+					<div class="h-20 w-28 shrink-0 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 sm:h-32 sm:w-48">
 						{#if thumb}
 							<img
 								src={resizeOtomotoImage(thumb, "480x360")!}

@@ -178,7 +178,7 @@
 	}
 </script>
 
-<div class="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-6">
+<div class="mx-auto flex w-full max-w-[1400px] flex-col gap-4 overflow-x-hidden px-3 py-6 sm:px-4">
 	<header class="flex items-start justify-between gap-3">
 		<div class="min-w-0">
 			<h1 class="text-2xl font-bold tracking-tight">Otomoto Aggregator</h1>

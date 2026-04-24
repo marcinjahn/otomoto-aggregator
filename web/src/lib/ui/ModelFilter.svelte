@@ -67,10 +67,10 @@
 	}
 </script>
 
-<div class="flex flex-col gap-3">
+<div class="flex flex-col gap-5">
 	{#each groups as g (g.make)}
 		<div>
-			<h4 class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+			<h4 class="mb-2 border-b border-neutral-200 pb-1 text-sm font-bold text-neutral-900 dark:border-neutral-700 dark:text-neutral-100">
 				{g.makeDisplay}
 			</h4>
 			<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">

@@ -1,0 +1,19 @@
+node_modules/
+.DS_Store
+*.log
+
+# Frontend
+web/.svelte-kit/
+web/build/
+web/.env
+web/.env.local
+web/.env.*.local
+
+# Worker
+worker/.wrangler/
+worker/.dev.vars
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/

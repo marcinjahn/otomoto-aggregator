@@ -1,0 +1,11 @@
+name = "otomoto-aggregator-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Browser-facing CORS allowlist. Add your deployed Pages origin and any preview origins.
+# At runtime the worker reads ALLOWED_ORIGINS (comma-separated). Localhost is always allowed.
+[vars]
+ALLOWED_ORIGINS = ""
+# Comma-separated hostnames that the worker is permitted to fetch from.
+TARGET_HOSTS = "www.otomoto.pl,otomoto.pl"

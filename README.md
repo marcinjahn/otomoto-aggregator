@@ -30,27 +30,42 @@ hop.
 
 ## Local development
 
-### Worker
+Top-level commands are wrapped in a `justfile`. Run `just` to list recipes.
+
+First-time setup:
 
 ```
-cd worker
-pnpm install
-pnpm dev     # runs wrangler dev on http://127.0.0.1:8787
+just install
+cp web/.env.example web/.env.local   # edit if the worker is on a different URL
+```
+
+Run both dev servers together (Ctrl-C stops both):
+
+```
+just dev
+```
+
+Or run them individually:
+
+```
+just worker   # wrangler dev on http://127.0.0.1:8787
+just web      # vite dev on http://localhost:5173
 ```
 
 No Cloudflare account is required for local dev — wrangler uses miniflare.
 
-### Web
+Open http://localhost:5173, pick filters (or paste an otomoto URL), hit
+**Szukaj ofert**.
+
+Other handy recipes:
 
 ```
-cd web
-pnpm install
-cp .env.example .env.local
-# edit .env.local if your worker is on a different URL
-pnpm dev
+just check          # svelte-check + worker tsc --noEmit
+just build          # static build of web/
+just preview        # preview the production build
+just deploy-worker  # wrangler deploy
+just clean          # remove web/build and web/.svelte-kit
 ```
-
-Open http://localhost:5173, paste an Otomoto search URL, hit Scrape.
 
 ## Deployment
 

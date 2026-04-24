@@ -1,42 +1,15 @@
-# sv
+# web
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit + TypeScript + Tailwind frontend for Otomoto Aggregator. Builds to a
+static site via `@sveltejs/adapter-static` and is deployed to GitHub Pages.
 
-## Creating a project
+See the [top-level README](../README.md) for architecture, setup, and deploy
+instructions. Prefer the `justfile` recipes at the repo root (`just dev`,
+`just build`, `just check`) instead of invoking `pnpm` here directly.
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Environment
 
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.15.1 create --template minimal --types ts --no-install web
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+- `VITE_PROXY_URL` — URL of the Cloudflare Worker CORS proxy (see
+  `.env.example`). Required at build time.
+- `BASE_PATH` — sub-path for project-site deploys (e.g. `/otomoto-aggregator`);
+  empty for root or user/org sites.

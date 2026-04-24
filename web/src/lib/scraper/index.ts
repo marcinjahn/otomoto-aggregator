@@ -120,6 +120,9 @@ async function fetchPage(
   try {
     res = await fetch(proxied, { signal: opts.signal });
   } catch (e) {
+    // Preserve AbortError so the caller can distinguish a user-requested
+    // cancel from a real network failure.
+    if ((e as Error).name === "AbortError") throw e;
     throw new ScrapeError(
       `Network error fetching page ${page}: ${(e as Error).message}`,
       page,

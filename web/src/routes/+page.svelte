@@ -279,7 +279,7 @@
 				onclick={() => {
 					cancel();
 					offers = null;
-					syncPageUrl(null);
+					error = null;
 				}}
 				class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
 			>

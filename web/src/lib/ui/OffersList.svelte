@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Offer } from "$lib/scraper/types";
 	import { formatInt, formatKm, formatMoney } from "./format";
-	import { resizeOtomotoImage } from "./image";
+	import { otomotoSrcSet, resizeOtomotoImage } from "./image";
 
 	let {
 		offers,
@@ -73,6 +73,7 @@
 	</div>
 	<ul class="divide-y divide-neutral-200 dark:divide-neutral-800">
 		{#each sorted as o (o.id)}
+			{@const thumb = o.thumbnailLarge ?? o.thumbnailSmall}
 			<li>
 				<a
 					href={o.url}
@@ -80,12 +81,15 @@
 					rel="noopener noreferrer"
 					class="flex gap-3 p-3 transition hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
 				>
-					<div class="h-24 w-32 shrink-0 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 sm:h-28 sm:w-40">
-						{#if o.thumbnailLarge ?? o.thumbnailSmall}
+					<div class="h-28 w-40 shrink-0 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 sm:h-32 sm:w-48">
+						{#if thumb}
 							<img
-								src={resizeOtomotoImage(o.thumbnailLarge ?? o.thumbnailSmall, "800x600")!}
+								src={resizeOtomotoImage(thumb, "480x360")!}
+								srcset={otomotoSrcSet(thumb) ?? undefined}
+								sizes="(min-width: 640px) 12rem, 10rem"
 								alt={o.title}
 								loading="lazy"
+								decoding="async"
 								class="h-full w-full object-cover"
 							/>
 						{/if}

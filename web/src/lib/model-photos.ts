@@ -1,4 +1,4 @@
-const CACHE_KEY = "otomoto-agg:model-photos:v2";
+const CACHE_KEY = "otomoto-agg:model-photos:v3";
 const NEGATIVE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const POSITIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -9,8 +9,8 @@ interface CacheEntry {
 
 const memory = new Map<string, Promise<string | null>>();
 
-function cacheKey(make: string, model: string): string {
-  return `${make.toLowerCase()}/${model.toLowerCase()}`;
+function cacheKey(make: string, model: string, year: number | null): string {
+  return `${make.toLowerCase()}/${model.toLowerCase()}/${year ?? ""}`;
 }
 
 function loadPersistent(): Record<string, CacheEntry> {
@@ -50,8 +50,9 @@ function writeCache(key: string, url: string | null) {
 async function queryWikipedia(
   make: string,
   model: string,
+  year: number | null,
 ): Promise<string | null> {
-  const search = `${make} ${model} car`;
+  const search = year ? `${make} ${model} ${year} car` : `${make} ${model} car`;
   const url = new URL("https://en.wikipedia.org/w/api.php");
   url.searchParams.set("action", "query");
   url.searchParams.set("format", "json");
@@ -80,8 +81,9 @@ async function queryWikipedia(
 export function getModelPhoto(
   make: string,
   model: string,
+  year: number | null = null,
 ): Promise<string | null> {
-  const key = cacheKey(make, model);
+  const key = cacheKey(make, model, year);
   const existing = memory.get(key);
   if (existing) return existing;
 
@@ -92,7 +94,7 @@ export function getModelPhoto(
     return p;
   }
 
-  const p = queryWikipedia(make, model)
+  const p = queryWikipedia(make, model, year)
     .catch(() => null)
     .then((url) => {
       writeCache(key, url);

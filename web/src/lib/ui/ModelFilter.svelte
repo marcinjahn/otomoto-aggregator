@@ -80,6 +80,7 @@
 							<ModelPhoto
 								make={m.makeDisplay ?? m.make}
 								model={m.modelDisplay ?? m.model}
+								year={m.yearMedian != null ? Math.round(m.yearMedian) : null}
 								fallback={resizeOtomotoImage(m.sampleThumbnail, "800x600")}
 								alt={`${m.makeDisplay} ${m.modelDisplay}`}
 							/>

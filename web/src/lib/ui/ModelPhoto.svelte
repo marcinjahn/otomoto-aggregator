@@ -4,12 +4,14 @@
 	let {
 		make,
 		model,
+		year = null,
 		fallback,
 		alt,
 		class: klass = "",
 	}: {
 		make: string;
 		model: string;
+		year?: number | null;
 		fallback: string | null;
 		alt: string;
 		class?: string;
@@ -21,7 +23,7 @@
 	$effect(() => {
 		let cancelled = false;
 		src = fallback;
-		getModelPhoto(make, model).then((url) => {
+		getModelPhoto(make, model, year).then((url) => {
 			if (!cancelled && url) src = url;
 		});
 		return () => {

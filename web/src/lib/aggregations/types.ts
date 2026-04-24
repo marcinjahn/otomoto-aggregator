@@ -21,6 +21,7 @@ export interface ModelBucket {
   priceRange: Range | null;
   priceMedian: number | null;
   yearRange: Range | null;
+  yearMedian: number | null;
   mileageRange: Range | null;
   mileageMedian: number | null;
   fuelMix: Record<string, number>;

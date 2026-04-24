@@ -45,7 +45,10 @@ function buildBucket(list: Offer[]): ModelBucket {
     .map((o) => o.priceAmount)
     .filter((v): v is number => v != null)
     .sort((a, b) => a - b);
-  const years = list.map((o) => o.year).filter((v): v is number => v != null);
+  const years = list
+    .map((o) => o.year)
+    .filter((v): v is number => v != null)
+    .sort((a, b) => a - b);
   const mileages = list
     .map((o) => o.mileageKm)
     .filter((v): v is number => v != null)
@@ -78,6 +81,7 @@ function buildBucket(list: Offer[]): ModelBucket {
     priceRange: priceMM,
     priceMedian: median(prices),
     yearRange: yearMM,
+    yearMedian: median(years),
     mileageRange: mileageMM,
     mileageMedian: median(mileages),
     fuelMix,

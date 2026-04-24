@@ -115,14 +115,16 @@
 </script>
 
 <div class="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-6">
-	<header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-		<div>
+	<header class="flex items-start justify-between gap-3">
+		<div class="min-w-0">
 			<h1 class="text-2xl font-bold tracking-tight">Otomoto Aggregator</h1>
 			<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
 				Paste an Otomoto search URL and discover what's on offer.
 			</p>
 		</div>
-		<ThemeSwitch />
+		<div class="shrink-0 pt-1">
+			<ThemeSwitch />
+		</div>
 	</header>
 
 	<form class="flex flex-col gap-2 sm:flex-row" onsubmit={run}>

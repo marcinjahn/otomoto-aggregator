@@ -109,32 +109,32 @@ function niceBucketWidth(rough: number): number {
 
 export const priceHistogram = makeHistogram(
   "hist-price",
-  "Price distribution",
-  "How offers are distributed across price bands (PLN).",
+  "Rozkład cen",
+  "Rozkład ofert względem przedziałów cenowych (PLN).",
   (o) => o.priceAmount,
   { targetBuckets: 12, label: (lo, hi) => `${formatK(lo)}–${formatK(hi)}` },
 );
 
 export const yearHistogram = makeHistogram(
   "hist-year",
-  "Production year distribution",
-  "How many offers exist per model year.",
+  "Rozkład rocznika",
+  "Liczba ofert wg rocznika.",
   (o) => o.year,
   { bucketWidth: 1, label: (lo) => `${lo}` },
 );
 
 export const mileageHistogram = makeHistogram(
   "hist-mileage",
-  "Mileage distribution",
-  "How offers are distributed across mileage bands (km).",
+  "Rozkład przebiegu",
+  "Rozkład ofert względem przedziałów przebiegu (km).",
   (o) => o.mileageKm,
   { targetBuckets: 12, label: (lo, hi) => `${formatK(lo)}–${formatK(hi)} km` },
 );
 
 export const priceOverall: Aggregator<PriceOverallResult> = {
   id: "price-overall",
-  title: "Price summary",
-  description: "Min / median / mean / max across all priced offers.",
+  title: "Podsumowanie cen",
+  description: "Min / mediana / średnia / maks wśród ofert z ceną.",
   compute(offers: Offer[]): PriceOverallResult {
     const priced = offers.filter((o) => o.priceAmount != null);
     const values = priced.map((o) => o.priceAmount!).sort((a, b) => a - b);

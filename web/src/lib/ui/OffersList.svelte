@@ -57,18 +57,18 @@
 			/ {formatInt(totalUnfiltered)}
 		</p>
 		<label class="flex items-center gap-1 text-xs">
-			<span class="hidden text-neutral-500 sm:inline">Sort</span>
+			<span class="hidden text-neutral-500 sm:inline">Sortuj</span>
 			<select
 				bind:value={sort}
-				aria-label="Sort offers"
+				aria-label="Sortowanie ofert"
 				class="max-w-[10rem] rounded border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-800"
 			>
-				<option value="price-asc">Price ↑</option>
-				<option value="price-desc">Price ↓</option>
-				<option value="year-desc">Year (newest)</option>
-				<option value="year-asc">Year (oldest)</option>
-				<option value="mileage-asc">Mileage (lowest)</option>
-				<option value="newest">Recently listed</option>
+				<option value="price-asc">Cena ↑</option>
+				<option value="price-desc">Cena ↓</option>
+				<option value="year-desc">Rok (najnowsze)</option>
+				<option value="year-asc">Rok (najstarsze)</option>
+				<option value="mileage-asc">Przebieg (najniższy)</option>
+				<option value="newest">Ostatnio dodane</option>
 			</select>
 		</label>
 	</div>
@@ -118,7 +118,7 @@
 			</li>
 		{:else}
 			<li class="p-8 text-center text-sm text-neutral-500">
-				No offers match the current filters.
+				Żadna oferta nie pasuje do wybranych filtrów.
 			</li>
 		{/each}
 	</ul>

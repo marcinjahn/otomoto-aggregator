@@ -15,9 +15,9 @@ function key(o: Offer): string | null {
 
 export const byModel: Aggregator<ByModelResult> = {
   id: "by-model",
-  title: "By model",
+  title: "Modele",
   description:
-    "Each make + model with offer count, price range, year range, and a sample photo.",
+    "Marka + model z liczbą ofert, zakresem cen i roczników oraz zdjęciem.",
   compute(offers: Offer[]): ByModelResult {
     const grouped = new Map<string, Offer[]>();
     let offersWithoutModel = 0;

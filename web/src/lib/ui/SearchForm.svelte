@@ -2,12 +2,10 @@
 	import { buildOtomotoUrl } from "$lib/otomoto-filters/build-url";
 	import {
 		FILTERS,
-		SORT_OPTIONS,
 		emptyForm,
 		genKey,
 		type NumericRangeValue,
 		type SearchFormState,
-		type SortOrder,
 	} from "$lib/otomoto-filters/types";
 	import { formatInt } from "./format";
 	import ChipGroup from "./ChipGroup.svelte";
@@ -16,12 +14,14 @@
 
 	interface Props {
 		disabled?: boolean;
-		onSubmit: (url: string) => void;
+		initial?: SearchFormState;
+		onSubmit: (url: string, state: SearchFormState) => void;
 	}
 
-	let { disabled = false, onSubmit }: Props = $props();
+	let { disabled = false, initial, onSubmit }: Props = $props();
 
-	let state = $state<SearchFormState>(emptyForm());
+	// svelte-ignore state_referenced_locally
+	let state = $state<SearchFormState>(initial ?? emptyForm());
 
 	const priceSteps = $derived(FILTERS.ranges["filter_float_price"]!.suggestions);
 	const yearSteps = $derived(FILTERS.ranges["filter_float_year"]!.suggestions);
@@ -147,9 +147,6 @@
 	function setPrivateBusiness(v: "private" | "business") {
 		state.privateBusiness = state.privateBusiness === v ? null : v;
 	}
-	function setSort(v: SortOrder) {
-		state.sort = v;
-	}
 	function reset() {
 		state = emptyForm();
 	}
@@ -157,7 +154,7 @@
 	function submit(e: Event) {
 		e.preventDefault();
 		if (disabled) return;
-		onSubmit(buildOtomotoUrl(state));
+		onSubmit(buildOtomotoUrl(state), state);
 	}
 
 	const activeCount = $derived(
@@ -421,7 +418,7 @@
 		{@const groupMeta = FILTERS.groups[groupId]}
 		{@const items = booleansByGroup[groupId] ?? []}
 		{#if groupMeta && items.length > 0}
-			<details class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+			<details open class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
 				<summary class="cursor-pointer px-4 py-3 text-base font-semibold">
 					{groupMeta.name}
 					{#if groupMeta.description}
@@ -443,7 +440,7 @@
 
 	{#if FILTERS.enums["filter_enum_air_conditioning_type"]}
 		<!-- Multi-enum extras not fitted elsewhere: air conditioning, sunroof, cruise control, lights, battery ownership -->
-		<details class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+		<details open class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
 			<summary class="cursor-pointer px-4 py-3 text-base font-semibold">
 				Komfort i oświetlenie
 			</summary>
@@ -501,18 +498,6 @@
 			</div>
 		</details>
 	{/if}
-
-	<section class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-		<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-			Sortowanie
-		</div>
-		<ChipGroup
-			options={SORT_OPTIONS}
-			selected={[state.sort]}
-			onToggle={(id) => setSort(id as SortOrder)}
-			ariaLabel="Sortowanie"
-		/>
-	</section>
 
 	<div class="sticky bottom-0 z-10 flex items-center justify-between gap-3 border-t border-neutral-200 bg-neutral-50/95 px-1 py-3 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/95">
 		<button

@@ -23,6 +23,8 @@ export interface ScrapeOptions {
   signal?: AbortSignal;
   /** Called whenever progress advances. */
   onProgress?: (p: ScrapeProgress) => void;
+  /** Called with the freshly-added offers from each page as they stream in. */
+  onBatch?: (newOffers: Offer[]) => void;
 }
 
 const DEFAULT_MAX_PAGES = 500;
@@ -47,6 +49,8 @@ export async function scrape(
 
   const allOffers: Offer[] = [...first.offers];
   const seen = new Set(first.offers.map((o) => o.id));
+
+  if (first.offers.length) opts.onBatch?.([...first.offers]);
 
   opts.onProgress?.({
     pagesCompleted: 1,
@@ -75,11 +79,14 @@ export async function scrape(
       if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       const page = pages[nextIdx++]!;
       const parsed = await fetchPage(searchUrl, page, opts);
+      const fresh: Offer[] = [];
       for (const o of parsed.offers) {
         if (seen.has(o.id)) continue;
         seen.add(o.id);
         allOffers.push(o);
+        fresh.push(o);
       }
+      if (fresh.length) opts.onBatch?.(fresh);
       pagesDone++;
       opts.onProgress?.({
         pagesCompleted: pagesDone,

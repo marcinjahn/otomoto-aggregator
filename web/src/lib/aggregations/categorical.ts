@@ -40,8 +40,8 @@ function makeCategorical(
 
 export const byFuelType = makeCategorical(
   "by-fuel",
-  "By fuel type",
-  "Distribution of offers across fuel types.",
+  "Rodzaj paliwa",
+  "Rozkład ofert według rodzaju paliwa.",
   (o) =>
     o.fuelType && o.fuelTypeDisplay
       ? { key: o.fuelType, display: o.fuelTypeDisplay }
@@ -50,8 +50,8 @@ export const byFuelType = makeCategorical(
 
 export const byGearbox = makeCategorical(
   "by-gearbox",
-  "By gearbox",
-  "Distribution of offers across gearbox types.",
+  "Skrzynia biegów",
+  "Rozkład ofert według rodzaju skrzyni biegów.",
   (o) =>
     o.gearbox && o.gearboxDisplay
       ? { key: o.gearbox, display: o.gearboxDisplay }
@@ -60,15 +60,15 @@ export const byGearbox = makeCategorical(
 
 export const byRegion = makeCategorical(
   "by-region",
-  "By region",
-  "Where the cars are located (by region/voivodeship).",
+  "Region",
+  "Lokalizacja ofert (województwo).",
   (o) => (o.region ? { key: o.region, display: o.region } : null),
 );
 
 export const byMake = makeCategorical(
   "by-make",
-  "By make",
-  "Top car makes in this search.",
+  "Marki",
+  "Najczęstsze marki w tym wyszukiwaniu.",
   (o) =>
     o.make && o.makeDisplay ? { key: o.make, display: o.makeDisplay } : null,
 );

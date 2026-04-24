@@ -1,4 +1,9 @@
-import type { NumericRangeValue, SearchFormState } from "./types";
+import {
+  FILTERS,
+  emptyForm,
+  type NumericRangeValue,
+  type SearchFormState,
+} from "./types";
 
 const BASE = "https://www.otomoto.pl/osobowe";
 
@@ -47,14 +52,85 @@ export function buildOtomotoUrl(state: SearchFormState): string {
   if (state.privateBusiness)
     pushSingle("private_business", state.privateBusiness);
 
-  // Always-on defaults: undamaged cars, no accident history.
-  pushSingle("filter_enum_damaged", "0");
-  pushSingle("filter_enum_no_accident", "1");
-
-  if (state.sort && state.sort !== "relevance_web") {
-    pushSingle("order", state.sort);
-  }
-
   const qs = params.join("&");
   return qs.length ? `${BASE}?${qs}` : BASE;
+}
+
+const BOOLEAN_IDS = new Set(FILTERS.booleans.map((b) => b.id));
+const ENUM_IDS = new Set(Object.keys(FILTERS.enums));
+const RANGE_IDS = new Set(Object.keys(FILTERS.ranges));
+const RANGE_STATE_KEYS: Record<string, keyof SearchFormState> = {
+  filter_float_price: "price",
+  filter_float_year: "year",
+  filter_float_mileage: "mileage",
+  filter_float_engine_capacity: "engineCapacity",
+  filter_float_engine_power: "enginePower",
+};
+
+/**
+ * Inverse of buildOtomotoUrl: extracts a SearchFormState from an otomoto URL's
+ * `search[...]` query params. Unknown keys are ignored.
+ */
+export function parseOtomotoUrl(raw: string): SearchFormState {
+  const state = emptyForm();
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return state;
+  }
+
+  for (const [key, value] of u.searchParams) {
+    const m = /^search\[([^\]]+)\](?:\[(\d+)\])?$/.exec(key);
+    if (!m) continue;
+    const rawId = m[1]!;
+
+    const rangeMatch = /^(.+):(from|to)$/.exec(rawId);
+    if (rangeMatch) {
+      const id = rangeMatch[1]!;
+      const side = rangeMatch[2] as "from" | "to";
+      const stateKey = RANGE_STATE_KEYS[id];
+      if (!stateKey) continue;
+      const num = Number(value);
+      if (!Number.isFinite(num)) continue;
+      (state[stateKey] as NumericRangeValue)[side] = num;
+      continue;
+    }
+
+    if (rawId === "filter_enum_make") {
+      if (!state.makes.includes(value)) state.makes.push(value);
+      continue;
+    }
+    if (rawId === "filter_enum_model") {
+      if (!state.models.includes(value)) state.models.push(value);
+      continue;
+    }
+    if (rawId === "filter_enum_generation") {
+      if (!state.generations.includes(value)) state.generations.push(value);
+      continue;
+    }
+    if (rawId === "new_used") {
+      if (value === "new" || value === "used") state.newUsed = value;
+      continue;
+    }
+    if (rawId === "private_business") {
+      if (value === "private" || value === "business")
+        state.privateBusiness = value;
+      continue;
+    }
+    if (BOOLEAN_IDS.has(rawId)) {
+      state.booleans[rawId] = value === "1" || value === "true";
+      continue;
+    }
+    if (ENUM_IDS.has(rawId)) {
+      const arr = state.enums[rawId] ?? [];
+      if (!arr.includes(value)) arr.push(value);
+      state.enums[rawId] = arr;
+      continue;
+    }
+    // Fallback: if a range id sneaks in without :from/:to, ignore.
+    if (RANGE_IDS.has(rawId)) continue;
+  }
+
+  return state;
 }

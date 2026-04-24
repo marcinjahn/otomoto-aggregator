@@ -56,25 +56,7 @@ export interface SearchFormState {
   booleans: Record<string, boolean>;
   newUsed: "new" | "used" | null;
   privateBusiness: "private" | "business" | null;
-  sort: SortOrder;
 }
-
-export type SortOrder =
-  | "relevance_web"
-  | "created_at_first:desc"
-  | "filter_float_price:asc"
-  | "filter_float_price:desc"
-  | "filter_float_mileage:asc"
-  | "filter_float_year:desc";
-
-export const SORT_OPTIONS: { id: SortOrder; name: string }[] = [
-  { id: "relevance_web", name: "Najbardziej trafne" },
-  { id: "created_at_first:desc", name: "Najnowsze" },
-  { id: "filter_float_price:asc", name: "Cena: rosnąco" },
-  { id: "filter_float_price:desc", name: "Cena: malejąco" },
-  { id: "filter_float_mileage:asc", name: "Przebieg: rosnąco" },
-  { id: "filter_float_year:desc", name: "Rok: malejąco" },
-];
 
 export function emptyForm(): SearchFormState {
   return {
@@ -90,7 +72,6 @@ export function emptyForm(): SearchFormState {
     booleans: {},
     newUsed: null,
     privateBusiness: null,
-    sort: "relevance_web",
   };
 }
 

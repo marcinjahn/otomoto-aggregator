@@ -39,6 +39,9 @@
 	import PriceSummary from "$lib/ui/PriceSummary.svelte";
 	import SearchForm from "$lib/ui/SearchForm.svelte";
 	import ThemeSwitch from "$lib/ui/ThemeSwitch.svelte";
+	import { parseOtomotoUrl } from "$lib/otomoto-filters/build-url";
+	import { emptyForm, type SearchFormState } from "$lib/otomoto-filters/types";
+	import { onMount } from "svelte";
 
 	let url = $state("");
 	let running = $state(false);
@@ -50,7 +53,26 @@
 	let filters = $state<FilterState>(emptyFilters());
 	let mobileFiltersOpen = $state(false);
 	let showUrlFallback = $state(false);
+	let formState = $state<SearchFormState>(emptyForm());
 	let controller: AbortController | null = null;
+
+	onMount(() => {
+		const params = new URLSearchParams(window.location.search);
+		const q = params.get("q");
+		if (!q) return;
+		formState = parseOtomotoUrl(q);
+		if (PROXY_URL) {
+			runWith(q);
+		}
+	});
+
+	function syncPageUrl(targetUrl: string | null) {
+		if (typeof window === "undefined") return;
+		const u = new URL(window.location.href);
+		if (targetUrl) u.searchParams.set("q", targetUrl);
+		else u.searchParams.delete("q");
+		window.history.replaceState(null, "", u.toString());
+	}
 
 	const activeFilterCount = $derived(
 		filters.models.size +
@@ -93,12 +115,13 @@
 
 	async function runWith(targetUrl: string) {
 		if (!PROXY_URL || running) return;
+		syncPageUrl(targetUrl);
 		running = true;
 		enriching = false;
 		error = null;
 		progress = null;
 		enrichProgress = null;
-		offers = null;
+		offers = [];
 		filters = emptyFilters();
 		controller = new AbortController();
 		try {
@@ -106,6 +129,10 @@
 				proxyUrl: PROXY_URL!,
 				signal: controller.signal,
 				onProgress: (p) => (progress = p),
+				onBatch: (batch) => {
+					// Stream offers into view as each page arrives.
+					offers = offers ? [...offers, ...batch] : [...batch];
+				},
 			});
 			offers = res.offers;
 			running = false;
@@ -213,32 +240,15 @@
 	</header>
 
 	{#if !offers && !running && !enriching}
-		<SearchForm disabled={!canSearch} onSubmit={(u) => runWith(u)} />
-	{/if}
+		<SearchForm
+			disabled={!canSearch}
+			initial={formState}
+			onSubmit={(u, s) => {
+				formState = s;
+				runWith(u);
+			}}
+		/>
 
-	{#if running || enriching}
-		<div class="flex items-center justify-end">
-			<button
-				type="button"
-				onclick={cancel}
-				class="rounded-md bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-300 dark:bg-neutral-800 dark:text-neutral-100"
-			>
-				{enriching ? "Zatrzymaj wzbogacanie" : "Anuluj"}
-			</button>
-		</div>
-	{:else if offers}
-		<div class="flex items-center justify-between gap-3">
-			<button
-				type="button"
-				onclick={() => (offers = null)}
-				class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
-			>
-				← Nowe wyszukiwanie
-			</button>
-		</div>
-	{/if}
-
-	{#if !offers && !running && !enriching}
 		<details bind:open={showUrlFallback} class="rounded-md border border-dashed border-neutral-300 bg-white/60 p-3 text-sm dark:border-neutral-700 dark:bg-neutral-900/60">
 			<summary class="cursor-pointer text-xs font-medium text-neutral-600 dark:text-neutral-400">
 				Wklej URL z otomoto zamiast używać filtrów
@@ -259,12 +269,35 @@
 				</button>
 			</form>
 		</details>
+	{:else}
+		<div class="flex items-center justify-between gap-3">
+			<button
+				type="button"
+				onclick={() => {
+					cancel();
+					offers = null;
+					syncPageUrl(null);
+				}}
+				class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+			>
+				← Nowe wyszukiwanie
+			</button>
+			{#if running || enriching}
+				<button
+					type="button"
+					onclick={cancel}
+					class="rounded-md bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-300 dark:bg-neutral-800 dark:text-neutral-100"
+				>
+					{enriching ? "Zatrzymaj wzbogacanie" : "Anuluj"}
+				</button>
+			{/if}
+		</div>
 	{/if}
 
 	{#if !PROXY_URL}
 		<div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-			<strong>Proxy not configured.</strong> Set <code>VITE_PROXY_URL</code> in
-			<code>.env.local</code> (dev) or as a GitHub Actions variable (production) and rebuild.
+			<strong>Proxy nie jest skonfigurowany.</strong> Ustaw <code>VITE_PROXY_URL</code> w
+			<code>.env.local</code> (dev) lub w zmiennych GitHub Actions (produkcja) i zbuduj ponownie.
 		</div>
 	{/if}
 
@@ -276,8 +309,8 @@
 		<div class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
 			<div class="mb-1 flex justify-between text-xs text-neutral-600 dark:text-neutral-400">
 				<span>
-					Page {progress.pagesCompleted} / {progress.totalPages} ·
-					{progress.offersCollected} offers so far
+					Strona {progress.pagesCompleted} / {progress.totalPages} ·
+					{progress.offersCollected} ofert
 				</span>
 				<span>{pct.toFixed(0)}%</span>
 			</div>
@@ -298,7 +331,7 @@
 		<div class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
 			<div class="mb-1 flex justify-between text-xs text-neutral-600 dark:text-neutral-400">
 				<span>
-					Fetching generation info · {enrichProgress.enriched} /
+					Pobieranie informacji o generacjach · {enrichProgress.enriched} /
 					{enrichProgress.total}
 				</span>
 				<span>{pct2.toFixed(0)}%</span>
@@ -329,7 +362,7 @@
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
 					<path d="M3 6h18" /><path d="M6 12h12" /><path d="M10 18h4" />
 				</svg>
-				<span>Filters</span>
+				<span>Filtry</span>
 				{#if activeFilterCount > 0}
 					<span class="rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">
 						{activeFilterCount}
@@ -337,7 +370,7 @@
 				{/if}
 			</button>
 			<span class="text-xs text-neutral-500">
-				{filtered.length} / {offers.length} offers
+				{filtered.length} / {offers.length} ofert
 			</span>
 		</div>
 
@@ -348,13 +381,13 @@
 					: "hidden flex-col gap-3 lg:static lg:flex lg:bg-transparent lg:p-0"}
 			>
 				<div class="flex items-center justify-between lg:hidden">
-					<h2 class="text-base font-semibold">Filters</h2>
+					<h2 class="text-base font-semibold">Filtry</h2>
 					<button
 						type="button"
 						onclick={() => (mobileFiltersOpen = false)}
 						class="rounded border border-neutral-300 bg-white px-3 py-1 text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900"
 					>
-						Done
+						Gotowe
 					</button>
 				</div>
 				{#if hasAnyFilter(filters)}
@@ -363,7 +396,7 @@
 						onclick={clearFilters}
 						class="self-start rounded border border-neutral-300 bg-white px-3 py-1 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
 					>
-						Clear all filters
+						Wyczyść filtry
 					</button>
 				{/if}
 
@@ -482,9 +515,5 @@
 				<OffersList offers={filtered} totalUnfiltered={offers.length} />
 			</section>
 		</div>
-	{:else if !running && !error}
-		<section class="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
-			Paste an Otomoto search URL above and hit Discover.
-		</section>
 	{/if}
 </div>

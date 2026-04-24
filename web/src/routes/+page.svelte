@@ -37,6 +37,7 @@
 	import ModelFilter from "$lib/ui/ModelFilter.svelte";
 	import OffersList from "$lib/ui/OffersList.svelte";
 	import PriceSummary from "$lib/ui/PriceSummary.svelte";
+	import SearchForm from "$lib/ui/SearchForm.svelte";
 	import ThemeSwitch from "$lib/ui/ThemeSwitch.svelte";
 
 	let url = $state("");
@@ -48,6 +49,7 @@
 	let offers = $state<Offer[] | null>(null);
 	let filters = $state<FilterState>(emptyFilters());
 	let mobileFiltersOpen = $state(false);
+	let showUrlFallback = $state(false);
 	let controller: AbortController | null = null;
 
 	const activeFilterCount = $derived(
@@ -63,6 +65,7 @@
 	);
 
 	const canSubmit = $derived(url.trim().length > 0 && !running && !!PROXY_URL);
+	const canSearch = $derived(!running && !enriching && !!PROXY_URL);
 
 	const agg = $derived(
 		offers
@@ -82,9 +85,14 @@
 	const filtered = $derived(offers ? applyFilters(offers, filters) : []);
 	const summary = $derived(priceOverall.compute(filtered));
 
-	async function run(e: Event) {
+	async function runUrl(e: Event) {
 		e.preventDefault();
 		if (!canSubmit) return;
+		await runWith(url.trim());
+	}
+
+	async function runWith(targetUrl: string) {
+		if (!PROXY_URL || running) return;
 		running = true;
 		enriching = false;
 		error = null;
@@ -94,7 +102,7 @@
 		filters = emptyFilters();
 		controller = new AbortController();
 		try {
-			const res = await scrape(url.trim(), {
+			const res = await scrape(targetUrl, {
 				proxyUrl: PROXY_URL!,
 				signal: controller.signal,
 				onProgress: (p) => (progress = p),
@@ -196,7 +204,7 @@
 		<div class="min-w-0">
 			<h1 class="text-2xl font-bold tracking-tight">Otomoto Aggregator</h1>
 			<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-				Paste an Otomoto search URL and discover what's on offer.
+				Wybierz filtry i odkryj co oferuje rynek — bez wchodzenia na otomoto.
 			</p>
 		</div>
 		<div class="shrink-0 pt-1">
@@ -204,32 +212,54 @@
 		</div>
 	</header>
 
-	<form class="flex flex-col gap-2 sm:flex-row" onsubmit={run}>
-		<input
-			type="url"
-			bind:value={url}
-			placeholder="https://www.otomoto.pl/osobowe/..."
-			required
-			class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-neutral-700 dark:bg-neutral-900"
-		/>
-		{#if running || enriching}
+	{#if !offers && !running && !enriching}
+		<SearchForm disabled={!canSearch} onSubmit={(u) => runWith(u)} />
+	{/if}
+
+	{#if running || enriching}
+		<div class="flex items-center justify-end">
 			<button
 				type="button"
 				onclick={cancel}
 				class="rounded-md bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-300 dark:bg-neutral-800 dark:text-neutral-100"
 			>
-				{enriching ? "Stop enriching" : "Cancel"}
+				{enriching ? "Zatrzymaj wzbogacanie" : "Anuluj"}
 			</button>
-		{:else}
+		</div>
+	{:else if offers}
+		<div class="flex items-center justify-between gap-3">
 			<button
-				type="submit"
-				disabled={!canSubmit}
-				class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm enabled:hover:bg-blue-500 disabled:opacity-50"
+				type="button"
+				onclick={() => (offers = null)}
+				class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
 			>
-				Discover
+				← Nowe wyszukiwanie
 			</button>
-		{/if}
-	</form>
+		</div>
+	{/if}
+
+	{#if !offers && !running && !enriching}
+		<details bind:open={showUrlFallback} class="rounded-md border border-dashed border-neutral-300 bg-white/60 p-3 text-sm dark:border-neutral-700 dark:bg-neutral-900/60">
+			<summary class="cursor-pointer text-xs font-medium text-neutral-600 dark:text-neutral-400">
+				Wklej URL z otomoto zamiast używać filtrów
+			</summary>
+			<form class="mt-3 flex flex-col gap-2 sm:flex-row" onsubmit={runUrl}>
+				<input
+					type="url"
+					bind:value={url}
+					placeholder="https://www.otomoto.pl/osobowe/..."
+					class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-neutral-700 dark:bg-neutral-900"
+				/>
+				<button
+					type="submit"
+					disabled={!canSubmit}
+					class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm enabled:hover:bg-blue-500 disabled:opacity-50"
+				>
+					Szukaj
+				</button>
+			</form>
+		</details>
+	{/if}
 
 	{#if !PROXY_URL}
 		<div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">

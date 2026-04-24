@@ -15,13 +15,26 @@
 	interface Props {
 		disabled?: boolean;
 		initial?: SearchFormState;
+		onChange?: (url: string, state: SearchFormState) => void;
 		onSubmit: (url: string, state: SearchFormState) => void;
 	}
 
-	let { disabled = false, initial, onSubmit }: Props = $props();
+	let { disabled = false, initial, onChange, onSubmit }: Props = $props();
 
 	// svelte-ignore state_referenced_locally
 	let state = $state<SearchFormState>(initial ?? emptyForm());
+
+	// Emit state changes so the parent can sync the page URL live as the user
+	// toggles filters. Skip the initial run so the URL isn't dirtied on mount.
+	let firstRun = true;
+	$effect(() => {
+		const url = buildOtomotoUrl(state);
+		if (firstRun) {
+			firstRun = false;
+			return;
+		}
+		onChange?.(url, state);
+	});
 
 	const priceSteps = $derived(FILTERS.ranges["filter_float_price"]!.suggestions);
 	const yearSteps = $derived(FILTERS.ranges["filter_float_year"]!.suggestions);

@@ -60,10 +60,9 @@
 		const params = new URLSearchParams(window.location.search);
 		const q = params.get("q");
 		if (!q) return;
+		// Landing on a shared link pre-populates the filter form but does NOT
+		// auto-scrape — the user can tweak before submitting.
 		formState = parseOtomotoUrl(q);
-		if (PROXY_URL) {
-			runWith(q);
-		}
 	});
 
 	function syncPageUrl(targetUrl: string | null) {
@@ -243,6 +242,10 @@
 		<SearchForm
 			disabled={!canSearch}
 			initial={formState}
+			onChange={(u, s) => {
+				formState = s;
+				syncPageUrl(u);
+			}}
 			onSubmit={(u, s) => {
 				formState = s;
 				runWith(u);

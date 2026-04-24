@@ -10,10 +10,8 @@
 
 	let { makes, selected, onToggle }: Props = $props();
 
-	// Sort by popularity so the most-relevant makes appear first,
-	// but show every make — no hidden items behind an expander.
 	const sorted = $derived(
-		[...makes].sort((a, b) => b.counter - a.counter || a.name.localeCompare(b.name, "pl")),
+		[...makes].sort((a, b) => a.name.localeCompare(b.name, "pl")),
 	);
 </script>
 

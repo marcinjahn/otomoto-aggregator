@@ -48,9 +48,8 @@
 		return out;
 	}
 
-	const priceRange = FILTERS.ranges["filter_float_price"]!;
 	const mileageRange = FILTERS.ranges["filter_float_mileage"]!;
-	const priceSteps = $derived(uniformSteps(priceRange.min, priceRange.max, 1000));
+	const priceSteps = $derived(uniformSteps(0, 300000, 1000));
 	const yearSteps = $derived(
 		FILTERS.ranges["filter_float_year"]!.suggestions.filter((y) => y >= 1990),
 	);

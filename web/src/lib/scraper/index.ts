@@ -74,11 +74,28 @@ export async function scrape(
   let nextIdx = 0;
   let pagesDone = 1;
 
+  // When the search exceeds otomoto's public pageable range (~500 results),
+  // later pages come back without an advertSearch payload. Treat that as a
+  // soft end-of-results and stop the rest of the workers.
+  let exhausted = false;
+
   const worker = async () => {
-    while (nextIdx < pages.length) {
+    while (nextIdx < pages.length && !exhausted) {
       if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       const page = pages[nextIdx++]!;
-      const parsed = await fetchPage(searchUrl, page, opts);
+      let parsed;
+      try {
+        parsed = await fetchPage(searchUrl, page, opts);
+      } catch (e) {
+        if (
+          e instanceof ScrapeError &&
+          /advertSearch payload not found/.test(e.message)
+        ) {
+          exhausted = true;
+          return;
+        }
+        throw e;
+      }
       const fresh: Offer[] = [];
       for (const o of parsed.offers) {
         if (seen.has(o.id)) continue;

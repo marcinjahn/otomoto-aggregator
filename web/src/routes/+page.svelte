@@ -126,7 +126,15 @@
 		running = true;
 		enriching = false;
 		error = null;
-		progress = null;
+		// Seed progress so the loader renders immediately, before the first page
+		// round-trip. The real values are filled in on the first onProgress call.
+		progress = {
+			pagesCompleted: 0,
+			totalPages: 0,
+			offersCollected: 0,
+			totalOffers: 0,
+			done: false,
+		};
 		enrichProgress = null;
 		offers = [];
 		filters = emptyFilters();

@@ -39,8 +39,12 @@
 	import PriceSummary from "$lib/ui/PriceSummary.svelte";
 	import SearchForm from "$lib/ui/SearchForm.svelte";
 	import ThemeSwitch from "$lib/ui/ThemeSwitch.svelte";
-	import { parseOtomotoUrl } from "$lib/otomoto-filters/build-url";
+	import {
+		buildOtomotoUrl,
+		parseOtomotoUrl,
+	} from "$lib/otomoto-filters/build-url";
 	import { emptyForm, type SearchFormState } from "$lib/otomoto-filters/types";
+	import { appliedFilterChips } from "$lib/otomoto-filters/applied-chips";
 	import { replaceState } from "$app/navigation";
 	import { page } from "$app/state";
 	import { onMount } from "svelte";
@@ -108,6 +112,8 @@
 	const filtered = $derived(offers ? applyFilters(offers, filters) : []);
 	const summary = $derived(priceOverall.compute(filtered));
 
+	const searchChips = $derived(appliedFilterChips(formState));
+
 	async function runUrl(e: Event) {
 		e.preventDefault();
 		if (!canSubmit) return;
@@ -173,6 +179,13 @@
 
 	function clearFilters() {
 		filters = emptyFilters();
+	}
+
+	function removeSearchChip(chip: ReturnType<typeof appliedFilterChips>[number]) {
+		if (running || enriching) return;
+		const next = chip.remove(formState);
+		formState = next;
+		runWith(buildOtomotoUrl(next));
 	}
 
 	function toggleModel(k: string) {
@@ -297,6 +310,26 @@
 				</button>
 			{/if}
 		</div>
+
+		{#if searchChips.length > 0}
+			<div class="flex flex-wrap items-center gap-1.5" aria-label="Zastosowane filtry">
+				{#each searchChips as chip (chip.key)}
+					<button
+						type="button"
+						onclick={() => removeSearchChip(chip)}
+						disabled={running || enriching}
+						aria-label="Usuń filtr: {chip.label}"
+						title="Usuń filtr"
+						class="inline-flex items-center gap-1.5 rounded-full border border-blue-500 bg-blue-600 px-3 py-1 text-xs font-medium text-white shadow-sm transition enabled:hover:bg-blue-500 disabled:opacity-60"
+					>
+						<span>{chip.label}</span>
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3" aria-hidden="true">
+							<path d="M18 6 6 18" /><path d="m6 6 12 12" />
+						</svg>
+					</button>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 
 	{#if !PROXY_URL}

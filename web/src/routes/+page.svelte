@@ -60,6 +60,7 @@
 	let mobileFiltersOpen = $state(false);
 	let showUrlFallback = $state(false);
 	let formState = $state<SearchFormState>(emptyForm());
+	let searchUrl = $state<string | null>(null);
 	let controller: AbortController | null = null;
 
 	onMount(() => {
@@ -123,6 +124,7 @@
 	async function runWith(targetUrl: string) {
 		if (!PROXY_URL || running) return;
 		syncPageUrl(targetUrl);
+		searchUrl = targetUrl;
 		running = true;
 		enriching = false;
 		error = null;
@@ -303,6 +305,7 @@
 					cancel();
 					offers = null;
 					error = null;
+					searchUrl = null;
 				}}
 				class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
 			>
@@ -557,8 +560,27 @@
 				</FilterSection>
 			</aside>
 
-			<section class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-				<OffersList offers={filtered} totalUnfiltered={offers.length} />
+			<section class="flex flex-col gap-3">
+				<div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+					<OffersList offers={filtered} totalUnfiltered={offers.length} />
+				</div>
+				{#if searchUrl}
+					<div class="flex justify-center">
+						<a
+							href={searchUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="inline-flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+						>
+							<span>Zobacz te wyniki na otomoto.pl</span>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
+								<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+								<path d="M15 3h6v6" />
+								<path d="M10 14 21 3" />
+							</svg>
+						</a>
+					</div>
+				{/if}
 			</section>
 		</div>
 	{/if}

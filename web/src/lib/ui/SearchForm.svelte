@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { buildOtomotoUrl } from "$lib/otomoto-filters/build-url";
+	import { buildOtomotoUrl } from "$lib/providers/otomoto/build-url";
 	import {
 		FILTERS,
 		emptyForm,
 		genKey,
 		type NumericRangeValue,
 		type SearchFormState,
-	} from "$lib/otomoto-filters/types";
+	} from "$lib/form/types";
 	import { formatInt } from "./format";
 	import ChipGroup from "./ChipGroup.svelte";
 	import MakePicker from "./MakePicker.svelte";
@@ -15,11 +15,26 @@
 	interface Props {
 		disabled?: boolean;
 		initial?: SearchFormState;
+		/** Filter ids honored only by otomoto in the current active provider set. */
+		otomotoOnlyFilters?: ReadonlySet<string>;
+		/** True when olx is one of the active providers; drives multi-make warning. */
+		olxActive?: boolean;
 		onChange?: (url: string, state: SearchFormState) => void;
 		onSubmit: (url: string, state: SearchFormState) => void;
 	}
 
-	let { disabled = false, initial, onChange, onSubmit }: Props = $props();
+	let {
+		disabled = false,
+		initial,
+		otomotoOnlyFilters,
+		olxActive = false,
+		onChange,
+		onSubmit,
+	}: Props = $props();
+
+	function isOtomotoOnly(id: string): boolean {
+		return otomotoOnlyFilters?.has(id) ?? false;
+	}
 
 	// svelte-ignore state_referenced_locally
 	let state = $state<SearchFormState>(initial ?? emptyForm());
@@ -221,6 +236,15 @@
 	const capacityFormat = (n: number) => `${formatInt(n)} cm³`;
 </script>
 
+{#snippet otomotoOnlyPill(id: string)}
+	{#if isOtomotoOnly(id)}
+		<span
+			class="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold text-orange-800 dark:bg-orange-950 dark:text-orange-300"
+			title="Filtr stosowany tylko do ofert z otomoto.pl"
+		>tylko otomoto</span>
+	{/if}
+{/snippet}
+
 <form onsubmit={submit} class="flex flex-col gap-4">
 	<section class="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
 		<h2 class="mb-3 text-base font-semibold">Marka i model</h2>
@@ -235,6 +259,11 @@
 					selected={state.makes}
 					onToggle={toggleMake}
 				/>
+				{#if olxActive && state.makes.length > 1}
+					<div class="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+						Uwaga dotyczy tylko <strong>olx.pl</strong>: ten serwis nie obsługuje wyszukiwania wielu marek, więc z olx.pl pobrane zostaną oferty wyłącznie marki <strong>{makeNameById[state.makes[0]!] ?? state.makes[0]}</strong>. Pozostałe źródła (np. otomoto.pl) zwrócą oferty wszystkich wybranych marek.
+					</div>
+				{/if}
 			</div>
 
 			{#if modelsByMake.length > 0}
@@ -264,8 +293,9 @@
 
 			{#if generationsByMakeModel.length > 0}
 				<div>
-					<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-						Generacja
+					<div class="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-neutral-500">
+						<span>Generacja</span>
+						{@render otomotoOnlyPill("generations")}
 					</div>
 					<div class="flex flex-col gap-3">
 						{#each generationsByMakeModel as grp (grp.key)}
@@ -377,8 +407,8 @@
 		</div>
 
 		<div>
-			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-				Liczba drzwi
+			<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+				<span>Liczba drzwi</span>{@render otomotoOnlyPill("filter_enum_door_count")}
 			</div>
 			<ChipGroup
 				options={FILTERS.enums["filter_enum_door_count"] ?? []}
@@ -388,8 +418,8 @@
 		</div>
 
 		<div>
-			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-				Liczba miejsc
+			<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+				<span>Liczba miejsc</span>{@render otomotoOnlyPill("filter_float_nr_seats")}
 			</div>
 			<ChipGroup
 				options={FILTERS.enums["filter_float_nr_seats"] ?? []}
@@ -410,8 +440,8 @@
 		</div>
 
 		<div>
-			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-				Typ lakieru
+			<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+				<span>Typ lakieru</span>{@render otomotoOnlyPill("filter_enum_colour_type")}
 			</div>
 			<ChipGroup
 				options={FILTERS.enums["filter_enum_colour_type"] ?? []}
@@ -421,8 +451,8 @@
 		</div>
 
 		<div>
-			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-				Tapicerka
+			<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+				<span>Tapicerka</span>{@render otomotoOnlyPill("filter_enum_upholstery_type")}
 			</div>
 			<ChipGroup
 				options={FILTERS.enums["filter_enum_upholstery_type"] ?? []}
@@ -436,8 +466,8 @@
 		<h2 class="text-base font-semibold">Ogłoszenie</h2>
 
 		<div>
-			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-				Typ oferty
+			<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+				<span>Typ oferty</span>{@render otomotoOnlyPill("newUsed")}
 			</div>
 			<ChipGroup
 				options={[
@@ -450,8 +480,8 @@
 		</div>
 
 		<div>
-			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-				Sprzedawca
+			<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+				<span>Sprzedawca</span>{@render otomotoOnlyPill("privateBusiness")}
 			</div>
 			<ChipGroup
 				options={[
@@ -464,8 +494,8 @@
 		</div>
 
 		<div>
-			<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-				Stan
+			<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+				<span>Stan</span>{@render otomotoOnlyPill("filter_enum_damaged")}
 			</div>
 			<ChipGroup
 				options={FILTERS.enums["filter_enum_damaged"] ?? []}
@@ -493,6 +523,7 @@
 			<details open class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
 				<summary class="cursor-pointer px-4 py-3 text-base font-semibold">
 					{groupMeta.name}
+					{@render otomotoOnlyPill("booleans")}
 					{#if groupMeta.description}
 						<span class="ml-2 text-xs font-normal text-neutral-500">
 							{groupMeta.description}
@@ -518,8 +549,8 @@
 			</summary>
 			<div class="flex flex-col gap-4 px-4 pb-4">
 				<div>
-					<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-						Klimatyzacja
+					<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+						<span>Klimatyzacja</span>{@render otomotoOnlyPill("filter_enum_air_conditioning_type")}
 					</div>
 					<ChipGroup
 						options={FILTERS.enums["filter_enum_air_conditioning_type"] ?? []}
@@ -528,8 +559,8 @@
 					/>
 				</div>
 				<div>
-					<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-						Szyberdach
+					<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+						<span>Szyberdach</span>{@render otomotoOnlyPill("filter_enum_sunroof")}
 					</div>
 					<ChipGroup
 						options={FILTERS.enums["filter_enum_sunroof"] ?? []}
@@ -538,8 +569,8 @@
 					/>
 				</div>
 				<div>
-					<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-						Tempomat
+					<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+						<span>Tempomat</span>{@render otomotoOnlyPill("filter_enum_cruisecontrol_type")}
 					</div>
 					<ChipGroup
 						options={FILTERS.enums["filter_enum_cruisecontrol_type"] ?? []}
@@ -548,8 +579,8 @@
 					/>
 				</div>
 				<div>
-					<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-						Reflektory
+					<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+						<span>Reflektory</span>{@render otomotoOnlyPill("filter_enum_headlight_lamp_type")}
 					</div>
 					<ChipGroup
 						options={FILTERS.enums["filter_enum_headlight_lamp_type"] ?? []}
@@ -558,8 +589,8 @@
 					/>
 				</div>
 				<div>
-					<div class="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-						Bateria (EV)
+					<div class="mb-2 flex items-center text-xs font-medium uppercase tracking-wide text-neutral-500">
+						<span>Bateria (EV)</span>{@render otomotoOnlyPill("filter_string_battery_ownership_model")}
 					</div>
 					<ChipGroup
 						options={FILTERS.enums["filter_string_battery_ownership_model"] ?? []}

@@ -1,16 +1,6 @@
-import { parseSearchPage } from "./parse";
-import type { Offer, ScrapeProgress, ScrapeResult } from "./types";
-import { ScrapeError } from "./types";
-
-export type { Offer, ScrapeProgress, ScrapeResult } from "./types";
-export { ScrapeError } from "./types";
-export {
-  enrichAll,
-  enrichOffer,
-  extractEnrichedFields,
-  type EnrichProgress,
-  type EnrichedFields,
-} from "./enrich";
+import { parseSearchPage } from "./parse-listing";
+import type { Offer, ScrapeProgress, ScrapeResult } from "../../scraper/types";
+import { ScrapeError } from "../../scraper/types";
 
 export interface ScrapeOptions {
   /** Proxy endpoint that accepts `?url=<encoded target>` and returns upstream body. */

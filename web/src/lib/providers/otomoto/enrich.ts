@@ -1,4 +1,4 @@
-import type { Offer } from "./types";
+import type { Offer } from "../../scraper/types";
 
 const NEXT_DATA_RE = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/;
 

@@ -9,6 +9,7 @@
 		byFuelType,
 		byGearbox,
 		byRegion,
+		bySource,
 	} from "$lib/aggregations";
 	import type { FilterState, NumericRange } from "$lib/filters/types";
 	import {
@@ -16,6 +17,7 @@
 		generationKey,
 		hasAnyFilter,
 		modelKey,
+		NO_GEN_CODE,
 	} from "$lib/filters/types";
 	import {
 		applyFilters,
@@ -25,26 +27,32 @@
 	} from "$lib/filters/apply";
 	import { PROXY_URL } from "$lib/config";
 	import {
-		enrichAll,
-		scrape,
-		type EnrichProgress,
-		type Offer,
-		type ScrapeProgress,
-	} from "$lib/scraper";
+		runSearch,
+		type ProviderProgressEntry,
+	} from "$lib/search/orchestrator";
+	import {
+		decodeProviderSet,
+		encodeProviderSet,
+	} from "$lib/search/provider-set";
+	import { getProvider, PROVIDERS } from "$lib/providers/registry";
+	import type { ProviderId } from "$lib/providers/types";
+	import type { Offer } from "$lib/scraper/types";
 	import CategoricalFilter from "$lib/ui/CategoricalFilter.svelte";
 	import FilterSection from "$lib/ui/FilterSection.svelte";
 	import HistogramFilter from "$lib/ui/HistogramFilter.svelte";
 	import ModelFilter from "$lib/ui/ModelFilter.svelte";
 	import OffersList from "$lib/ui/OffersList.svelte";
 	import PriceSummary from "$lib/ui/PriceSummary.svelte";
+	import ProviderToggle from "$lib/ui/ProviderToggle.svelte";
 	import SearchForm from "$lib/ui/SearchForm.svelte";
 	import ThemeSwitch from "$lib/ui/ThemeSwitch.svelte";
 	import {
 		buildOtomotoUrl,
 		parseOtomotoUrl,
-	} from "$lib/otomoto-filters/build-url";
-	import { emptyForm, type SearchFormState } from "$lib/otomoto-filters/types";
-	import { appliedFilterChips } from "$lib/otomoto-filters/applied-chips";
+	} from "$lib/providers/otomoto/build-url";
+	import { emptyForm, type SearchFormState } from "$lib/form/types";
+	import { appliedFilterChips } from "$lib/form/applied-chips";
+	import { filterLabel } from "$lib/filter-compat/resolver";
 	import { replaceState } from "$app/navigation";
 	import { page } from "$app/state";
 
@@ -57,26 +65,65 @@
 		return q ? parseOtomotoUrl(q) : emptyForm();
 	})();
 
+	// Provider set defaults:
+	//   - explicit ?p= → respect it
+	//   - otherwise → all providers on
+	const initialProviders: ProviderId[] = (() => {
+		const explicit = decodeProviderSet(page.url.searchParams.get("p"));
+		if (explicit) return explicit;
+		return PROVIDERS.map((p) => p.id);
+	})();
+
 	let url = $state("");
 	let running = $state(false);
 	let enriching = $state(false);
 	let error = $state<string | null>(null);
-	let progress = $state<ScrapeProgress | null>(null);
-	let enrichProgress = $state<EnrichProgress | null>(null);
+	let providerProgress = $state<ProviderProgressEntry[]>([]);
+	let enrichProgressByProvider = $state<
+		Record<string, { enriched: number; total: number; failed: number }>
+	>({});
 	let offers = $state<Offer[] | null>(null);
 	let filters = $state<FilterState>(emptyFilters());
 	let mobileFiltersOpen = $state(false);
 	let showUrlFallback = $state(false);
 	let formState = $state<SearchFormState>(initialFormState);
-	let searchUrl = $state<string | null>(null);
+	let activeProviders = $state<ProviderId[]>(initialProviders);
+	/** Provider set used for the *current* (or most recent) search — controls Zobacz na… buttons. */
+	let searchProviders = $state<ProviderId[]>([]);
+	let searchFormSnapshot = $state<SearchFormState | null>(null);
 	let controller: AbortController | null = null;
+	let showScrollTop = $state(false);
 
-	function syncPageUrl(targetUrl: string | null) {
+	$effect(() => {
+		const onScroll = () => {
+			showScrollTop = window.scrollY > 600;
+		};
+		onScroll();
+		window.addEventListener("scroll", onScroll, { passive: true });
+		return () => window.removeEventListener("scroll", onScroll);
+	});
+
+	function scrollToTop() {
+		window.scrollTo({ top: 0, behavior: "smooth" });
+	}
+
+	function syncPageUrl(targetUrl: string | null, providers = activeProviders) {
 		if (typeof window === "undefined") return;
 		const u = new URL(page.url);
 		if (targetUrl) u.searchParams.set("q", targetUrl);
 		else u.searchParams.delete("q");
+		const allProviders = PROVIDERS.length;
+		if (providers.length > 0 && providers.length < allProviders) {
+			u.searchParams.set("p", encodeProviderSet(providers));
+		} else {
+			u.searchParams.delete("p");
+		}
 		replaceState(u, page.state);
+	}
+
+	function setActiveProviders(next: ProviderId[]) {
+		activeProviders = next;
+		syncPageUrl(buildOtomotoUrl(formState), next);
 	}
 
 	const activeFilterCount = $derived(
@@ -86,6 +133,7 @@
 			filters.fuelTypes.size +
 			filters.gearboxes.size +
 			filters.regions.size +
+			filters.sources.size +
 			filters.priceRanges.length +
 			filters.yearRanges.length +
 			filters.mileageRanges.length
@@ -93,6 +141,21 @@
 
 	const canSubmit = $derived(url.trim().length > 0 && !running && !!PROXY_URL);
 	const canSearch = $derived(!running && !enriching && !!PROXY_URL);
+
+	// Filter ids that only otomoto can honor *given the current active provider set*.
+	// When olx is off, no marks. When olx is on, every filter id in olx's
+	// unsupportedFilters becomes "otomoto only".
+	const otomotoOnlyFilters = $derived.by(() => {
+		const otherProviders = PROVIDERS.filter(
+			(p) => activeProviders.includes(p.id) && p.id !== "otomoto",
+		);
+		if (otherProviders.length === 0) return new Set<string>();
+		const all = new Set<string>();
+		for (const p of otherProviders) {
+			for (const id of p.unsupportedFilters) all.add(id);
+		}
+		return all;
+	});
 
 	const agg = $derived(
 		offers
@@ -105,6 +168,7 @@
 					byFuel: byFuelType.compute(offers),
 					byGearbox: byGearbox.compute(offers),
 					byRegion: byRegion.compute(offers),
+					bySource: bySource.compute(offers),
 				}
 			: null
 	);
@@ -114,70 +178,121 @@
 
 	const searchChips = $derived(appliedFilterChips(formState));
 
+	// If the user post-filters by a specific generation, count olx offers
+	// dropped purely because they have no generation data. Disclosure note
+	// surfaces this so they understand why their olx count fell.
+	const hiddenOlxByGenerationFilter = $derived.by(() => {
+		if (!offers || filters.generations.size === 0) return 0;
+		let n = 0;
+		for (const o of offers) {
+			if (o.source !== "olx") continue;
+			if (o.generationCode != null) continue;
+			if (!o.make || !o.model) continue;
+			const gk = generationKey(o.make, o.model, NO_GEN_CODE);
+			// Hidden iff its NO_GEN key is not in the active generation selection
+			// AND the model isn't whole-selected.
+			const mk = modelKey(o.make, o.model);
+			if (filters.models.has(mk)) continue;
+			if (!filters.generations.has(gk)) n++;
+		}
+		return n;
+	});
+
+	// Aggregated dropped-filter set across active providers (each provider's
+	// resolver result is captured as `entry.dropped`). For the banner.
+	const droppedFiltersByProvider = $derived(
+		providerProgress
+			.filter((p) => p.dropped.length > 0)
+			.map((p) => ({
+				id: p.id,
+				label: p.label,
+				dropped: p.dropped,
+			})),
+	);
+
 	async function runUrl(e: Event) {
 		e.preventDefault();
 		if (!canSubmit) return;
-		await runWith(url.trim());
+		const target = url.trim();
+		// The fallback input is otomoto-only; reuse parseOtomotoUrl to seed form.
+		formState = parseOtomotoUrl(target);
+		await runWith();
 	}
 
-	async function runWith(targetUrl: string) {
+	async function runWith() {
 		if (!PROXY_URL || running) return;
+		const targetUrl = buildOtomotoUrl(formState);
 		syncPageUrl(targetUrl);
-		searchUrl = targetUrl;
+		searchProviders = [...activeProviders];
+		searchFormSnapshot = formState;
 		running = true;
 		enriching = false;
 		error = null;
-		// Seed progress so the loader renders immediately, before the first page
-		// round-trip. The real values are filled in on the first onProgress call.
-		progress = {
-			pagesCompleted: 0,
-			totalPages: 0,
-			offersCollected: 0,
-			totalOffers: 0,
-			done: false,
-		};
-		enrichProgress = null;
 		offers = [];
 		filters = emptyFilters();
+		providerProgress = activeProviders.map((id) => {
+			const p = getProvider(id);
+			return {
+				id,
+				label: p.label,
+				done: false,
+				pagesCompleted: 0,
+				totalPages: 0,
+				offersCollected: 0,
+				totalOffers: 0,
+				error: null,
+				dropped: [],
+			};
+		});
+		enrichProgressByProvider = {};
 		controller = new AbortController();
 		try {
-			const res = await scrape(targetUrl, {
+			await runSearch({
 				proxyUrl: PROXY_URL!,
 				signal: controller.signal,
-				onProgress: (p) => (progress = p),
-				onBatch: (batch) => {
-					// Stream offers into view as each page arrives.
+				providers: activeProviders.map((id) => getProvider(id)),
+				form: formState,
+				onProgress: (entries) => (providerProgress = entries),
+				onAppend: (batch) => {
 					offers = offers ? [...offers, ...batch] : [...batch];
 				},
+				onReplace: (changes) => {
+					if (!offers) return;
+					const next = [...offers];
+					for (const { index, offer } of changes) {
+						if (index >= 0 && index < next.length) next[index] = offer;
+					}
+					offers = next;
+				},
+				onEnrichProgress: (providerId, p) => {
+					enriching = p.enriched < p.total;
+					enrichProgressByProvider = {
+						...enrichProgressByProvider,
+						[providerId]: p,
+					};
+				},
+				onEnrichOffer: (offerId, fields) => {
+					const arr = offers;
+					if (!arr) return;
+					const idx = arr.findIndex((o) => o.id === offerId);
+					if (idx < 0) return;
+					const next = [...arr];
+					next[idx] = { ...arr[idx]!, ...fields };
+					offers = next;
+				},
 			});
-			offers = res.offers;
-			running = false;
-			if (res.offers.length > 0 && !controller.signal.aborted) {
-				enriching = true;
-				enrichProgress = { enriched: 0, total: res.offers.length, failed: 0 };
-				await enrichAll(res.offers, {
-					proxyUrl: PROXY_URL!,
-					signal: controller.signal,
-					onProgress: (p) => (enrichProgress = p),
-					onOffer: (offerId, fields) => {
-						// Mutate the offer in state so aggregations recompute reactively.
-						const arr = offers;
-						if (!arr) return;
-						const idx = arr.findIndex((o) => o.id === offerId);
-						if (idx < 0) return;
-						const next = [...arr];
-						next[idx] = { ...arr[idx]!, ...fields };
-						offers = next;
-					},
-				});
-			}
 		} catch (e) {
 			if ((e as Error).name !== "AbortError") {
 				error = (e as Error).message;
 			}
 		} finally {
 			running = false;
-			enriching = false;
+			// Enrichment continues asynchronously in the background; mark its
+			// state from the latest progress snapshot.
+			const stillEnriching = Object.values(enrichProgressByProvider).some(
+				(p) => p.enriched < p.total,
+			);
+			enriching = stillEnriching;
 			controller = null;
 		}
 	}
@@ -192,14 +307,11 @@
 
 	function removeSearchChip(chip: ReturnType<typeof appliedFilterChips>[number]) {
 		if (running || enriching) return;
-		const next = chip.remove(formState);
-		formState = next;
-		runWith(buildOtomotoUrl(next));
+		formState = chip.remove(formState);
+		runWith();
 	}
 
 	function toggleModel(k: string) {
-		// Clearing any per-generation selections for this model keeps the state
-		// tidy when the user flips back to the whole-model view.
 		const relatedGens = [...filters.generations].filter((g) =>
 			g.startsWith(`${k}__`)
 		);
@@ -235,6 +347,12 @@
 	function toggleRegion(k: string) {
 		filters = { ...filters, regions: toggleSet(filters.regions, k) };
 	}
+	function toggleSource(k: string) {
+		filters = {
+			...filters,
+			sources: toggleSet(filters.sources, k as ProviderId),
+		};
+	}
 	function togglePriceRange(r: NumericRange) {
 		filters = { ...filters, priceRanges: toggleRange(filters.priceRanges, r) };
 	}
@@ -254,7 +372,7 @@
 		<div class="min-w-0">
 			<h1 class="text-2xl font-bold tracking-tight">Otomoto Aggregator</h1>
 			<p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-				Wybierz filtry i odkryj co oferuje rynek — bez wchodzenia na otomoto.
+				Wybierz filtry i odkryj co oferuje rynek — bez wchodzenia na otomoto i olx.
 			</p>
 		</div>
 		<div class="shrink-0 pt-1">
@@ -263,16 +381,23 @@
 	</header>
 
 	{#if !offers && !running && !enriching}
+		<ProviderToggle
+			active={activeProviders}
+			onChange={setActiveProviders}
+		/>
+
 		<SearchForm
 			disabled={!canSearch}
 			initial={formState}
+			otomotoOnlyFilters={otomotoOnlyFilters}
+			olxActive={activeProviders.includes("olx")}
 			onChange={(u, s) => {
 				formState = s;
 				syncPageUrl(u);
 			}}
 			onSubmit={(u, s) => {
 				formState = s;
-				runWith(u);
+				runWith();
 			}}
 		/>
 
@@ -304,7 +429,8 @@
 					cancel();
 					offers = null;
 					error = null;
-					searchUrl = null;
+					searchProviders = [];
+					searchFormSnapshot = null;
 				}}
 				class="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
 			>
@@ -316,7 +442,7 @@
 					onclick={cancel}
 					class="rounded-md bg-neutral-200 px-4 py-2 text-sm font-medium text-neutral-800 shadow-sm hover:bg-neutral-300 dark:bg-neutral-800 dark:text-neutral-100"
 				>
-					{enriching ? "Zatrzymaj wzbogacanie" : "Anuluj"}
+					{enriching && !running ? "Zatrzymaj wzbogacanie" : "Anuluj"}
 				</button>
 			{/if}
 		</div>
@@ -349,48 +475,71 @@
 		</div>
 	{/if}
 
-	{#if running && progress}
-		{@const pct =
-			progress.totalPages > 0
-				? (progress.pagesCompleted / progress.totalPages) * 100
-				: 0}
-		<div class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-			<div class="mb-1 flex justify-between text-xs text-neutral-600 dark:text-neutral-400">
-				<span>
-					Strona {progress.pagesCompleted} / {progress.totalPages} ·
-					{progress.offersCollected} ofert
-				</span>
-				<span>{pct.toFixed(0)}%</span>
-			</div>
-			<div class="h-2 rounded bg-neutral-200 dark:bg-neutral-800">
-				<div
-					class="h-2 rounded bg-blue-500 transition-all"
-					style="width: {pct}%"
-				></div>
-			</div>
+	{#if droppedFiltersByProvider.length > 0}
+		<div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+			{#each droppedFiltersByProvider as p (p.id)}
+				<div>
+					<strong>{p.label}</strong> ignoruje filtry: {p.dropped.map((d) => d.label).join(", ")}.
+				</div>
+			{/each}
 		</div>
 	{/if}
 
-	{#if enriching && enrichProgress}
-		{@const pct2 =
-			enrichProgress.total > 0
-				? (enrichProgress.enriched / enrichProgress.total) * 100
-				: 0}
-		<div class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
-			<div class="mb-1 flex justify-between text-xs text-neutral-600 dark:text-neutral-400">
-				<span>
-					Pobieranie informacji o generacjach · {enrichProgress.enriched} /
-					{enrichProgress.total}
-				</span>
-				<span>{pct2.toFixed(0)}%</span>
-			</div>
-			<div class="h-1.5 rounded bg-neutral-200 dark:bg-neutral-800">
-				<div
-					class="h-1.5 rounded bg-emerald-500 transition-all"
-					style="width: {pct2}%"
-				></div>
-			</div>
+	{#if running || providerProgress.some((p) => !p.done)}
+		<div class="flex flex-col gap-2">
+			{#each providerProgress as p (p.id)}
+				{@const pct =
+					p.totalPages > 0
+						? (p.pagesCompleted / p.totalPages) * 100
+						: 0}
+				<div class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<div class="mb-1 flex justify-between text-xs text-neutral-600 dark:text-neutral-400">
+						<span>
+							<strong>{p.label}</strong>
+							{#if !p.error}
+								· Strona {p.pagesCompleted} / {p.totalPages || "?"} · {p.offersCollected} ofert
+							{/if}
+						</span>
+						<span>{p.error ? "" : `${pct.toFixed(0)}%`}</span>
+					</div>
+					{#if p.error}
+						<div class="text-xs text-red-700 dark:text-red-300">
+							Błąd: {p.error}
+						</div>
+					{:else}
+						<div class="h-2 rounded bg-neutral-200 dark:bg-neutral-800">
+							<div
+								class="h-2 rounded bg-blue-500 transition-all"
+								style="width: {pct}%"
+							></div>
+						</div>
+					{/if}
+				</div>
+			{/each}
 		</div>
+	{/if}
+
+	{#if enriching}
+		{#each Object.entries(enrichProgressByProvider) as [providerId, ep] (providerId)}
+			{#if ep.enriched < ep.total}
+				{@const pct2 = ep.total > 0 ? (ep.enriched / ep.total) * 100 : 0}
+				<div class="rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-900">
+					<div class="mb-1 flex justify-between text-xs text-neutral-600 dark:text-neutral-400">
+						<span>
+							<strong>{getProvider(providerId as ProviderId).label}</strong> ·
+							Pobieranie informacji o generacjach · {ep.enriched} / {ep.total}
+						</span>
+						<span>{pct2.toFixed(0)}%</span>
+					</div>
+					<div class="h-1.5 rounded bg-neutral-200 dark:bg-neutral-800">
+						<div
+							class="h-1.5 rounded bg-emerald-500 transition-all"
+							style="width: {pct2}%"
+						></div>
+					</div>
+				</div>
+			{/if}
+		{/each}
 	{/if}
 
 	{#if error}
@@ -510,6 +659,20 @@
 					/>
 				</FilterSection>
 
+				{#if agg.bySource.buckets.length > 1}
+					<FilterSection
+						title={bySource.title}
+						active={filters.sources.size > 0}
+						onClear={() => (filters = { ...filters, sources: new Set() })}
+					>
+						<CategoricalFilter
+							result={agg.bySource}
+							selected={filters.sources}
+							onToggle={toggleSource}
+						/>
+					</FilterSection>
+				{/if}
+
 				<FilterSection
 					title={byMake.title}
 					active={filters.makes.size > 0}
@@ -559,28 +722,51 @@
 				</FilterSection>
 			</aside>
 
-			<section class="flex flex-col gap-3">
+			<section class="flex min-w-0 flex-col gap-3">
+				{#if hiddenOlxByGenerationFilter > 0}
+					<div class="rounded-md border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400">
+						{hiddenOlxByGenerationFilter} ofert z olx.pl ukryto — brak danych o generacji.
+					</div>
+				{/if}
 				<div class="rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
 					<OffersList offers={filtered} totalUnfiltered={offers.length} />
 				</div>
-				{#if searchUrl}
-					<div class="flex justify-center">
-						<a
-							href={searchUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="inline-flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
-						>
-							<span>Zobacz te wyniki na otomoto.pl</span>
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
-								<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-								<path d="M15 3h6v6" />
-								<path d="M10 14 21 3" />
-							</svg>
-						</a>
+				{#if searchProviders.length > 0 && searchFormSnapshot}
+					<div class="flex flex-wrap justify-center gap-2">
+						{#each searchProviders as id (id)}
+							{@const provider = getProvider(id)}
+							{@const href = provider.resultsPageUrl(searchFormSnapshot)}
+							<a
+								{href}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+							>
+								<span>Zobacz te wyniki na {provider.label}</span>
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">
+									<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+									<path d="M15 3h6v6" />
+									<path d="M10 14 21 3" />
+								</svg>
+							</a>
+						{/each}
 					</div>
 				{/if}
 			</section>
 		</div>
 	{/if}
 </div>
+
+{#if showScrollTop}
+	<button
+		type="button"
+		onclick={scrollToTop}
+		aria-label="Przewiń do góry"
+		title="Przewiń do góry"
+		class="fixed bottom-4 right-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-700 shadow-lg transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+	>
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
+			<path d="m18 15-6-6-6 6" />
+		</svg>
+	</button>
+{/if}

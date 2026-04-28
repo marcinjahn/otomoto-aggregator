@@ -1,4 +1,4 @@
-import type { Offer } from "./types";
+import type { Offer } from "../../scraper/types";
 
 const NEXT_DATA_RE = /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/;
 
@@ -90,6 +90,7 @@ function nodeToOffer(node: RawNode): Offer {
   const priceCurrency = node.price?.amount?.currencyCode ?? null;
 
   return {
+    source: "otomoto",
     id: node.id,
     title: node.title,
     shortDescription: node.shortDescription ?? null,

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { NumericRangeValue } from "$lib/otomoto-filters/types";
+	import type { NumericRangeValue } from "$lib/form/types";
 
 	interface Props {
 		label: string;

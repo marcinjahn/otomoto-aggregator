@@ -1,3 +1,5 @@
+import type { ProviderId } from "../providers/types";
+
 export type ModelKey = string;
 export type GenerationKey = string;
 
@@ -15,6 +17,8 @@ export interface FilterState {
   fuelTypes: Set<string>;
   gearboxes: Set<string>;
   regions: Set<string>;
+  /** Post-search source filter; restricts the merged offer list to specific providers. */
+  sources: Set<ProviderId>;
   priceRanges: NumericRange[];
   yearRanges: NumericRange[];
   mileageRanges: NumericRange[];
@@ -28,6 +32,7 @@ export function emptyFilters(): FilterState {
     fuelTypes: new Set(),
     gearboxes: new Set(),
     regions: new Set(),
+    sources: new Set(),
     priceRanges: [],
     yearRanges: [],
     mileageRanges: [],
@@ -42,6 +47,7 @@ export function hasAnyFilter(f: FilterState): boolean {
     f.fuelTypes.size > 0 ||
     f.gearboxes.size > 0 ||
     f.regions.size > 0 ||
+    f.sources.size > 0 ||
     f.priceRanges.length > 0 ||
     f.yearRanges.length > 0 ||
     f.mileageRanges.length > 0

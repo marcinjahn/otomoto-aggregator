@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { MakeEntry } from "$lib/otomoto-filters/types";
+	import type { MakeEntry } from "$lib/form/types";
 
 	interface Props {
 		makes: MakeEntry[];
@@ -16,7 +16,7 @@
 	const selectedSet = $derived(new Set(selected));
 
 	function logoUrl(id: string) {
-		return `https://cdn.jsdelivr.net/gh/filippofilip95/car-logos-dataset/logos/optimized/${id}.png`;
+		return `https://cdn.jsdelivr.net/gh/filippofilip95/car-logos-dataset/logos/thumb/${id}.png`;
 	}
 </script>
 

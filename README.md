@@ -1,9 +1,16 @@
 # Otomoto Aggregator
 
-Static web app that scrapes an Otomoto search-results URL, walks every result
-page, and presents the collected offers as rich aggregations: by model (with a
-sample photo, price and year ranges, drill-down to raw offers), price / year /
-mileage histograms, and splits by make / fuel / gearbox / region.
+Static web app that scrapes car listings from **otomoto.pl** and **olx.pl** in
+parallel, walks every result page, and presents the merged offers as rich
+aggregations: by model (with a sample photo, price and year ranges, drill-down
+to raw offers), price / year / mileage histograms, and splits by source / make
+/ fuel / gearbox / region.
+
+The same on-page filter form drives both providers; each provider builds its
+own search URL from the shared form state, scrapes its result pages, and
+streams offers into a unified list. Filters that a provider can't honor are
+dropped from its URL and surfaced in the UI. OLX ads syndicated from otomoto
+are de-duplicated against the canonical otomoto record.
 
 Architecture:
 
@@ -11,15 +18,17 @@ Architecture:
 browser ──► GitHub Pages (static SvelteKit)
                  │
                  ▼
-          Cloudflare Worker CORS proxy (only proxies www.otomoto.pl)
+          Cloudflare Worker CORS proxy (allowlisted hosts)
                  │
-                 ▼
-              otomoto.pl
+          ┌──────┴──────┐
+          ▼             ▼
+       otomoto.pl     olx.pl
 ```
 
 The frontend is a pure static SPA on GitHub Pages. The worker is a tiny,
-allowlisted CORS proxy — Otomoto blocks direct browser fetches, so we need one
-hop.
+allowlisted CORS proxy — both otomoto and olx block direct browser fetches, so
+we need one hop. The set of allowed upstreams lives in `worker/wrangler.toml`
+under `TARGET_HOSTS`.
 
 ## Layout
 
@@ -54,8 +63,8 @@ just web      # vite dev on http://localhost:5173
 
 No Cloudflare account is required for local dev — wrangler uses miniflare.
 
-Open http://localhost:5173, pick filters (or paste an otomoto URL), hit
-**Szukaj ofert**.
+Open http://localhost:5173, pick filters (or paste an otomoto URL), pick which
+sources to query (otomoto.pl, olx.pl, or both), and hit **Szukaj ofert**.
 
 Other handy recipes:
 

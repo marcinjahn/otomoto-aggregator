@@ -3,7 +3,7 @@ import {
   emptyForm,
   type NumericRangeValue,
   type SearchFormState,
-} from "./types";
+} from "../../form/types";
 
 const BASE = "https://www.otomoto.pl/osobowe";
 

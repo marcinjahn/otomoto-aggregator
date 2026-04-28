@@ -7,7 +7,7 @@
 	import type { GenerationKey, ModelKey } from "$lib/filters/types";
 	import { generationKey, modelKey } from "$lib/filters/types";
 	import { formatInt, formatMoney, formatRange } from "./format";
-	import { resizeOtomotoImage } from "./image";
+	import { resizeOlxCdnImage } from "./image";
 	import ModelPhoto from "./ModelPhoto.svelte";
 
 	let {
@@ -101,7 +101,7 @@
 									make={m.makeDisplay ?? m.make}
 									model={m.modelDisplay ?? m.model}
 									year={m.yearMedian != null ? Math.round(m.yearMedian) : null}
-									fallback={resizeOtomotoImage(m.sampleThumbnail, "800x600")}
+									fallback={resizeOlxCdnImage(m.sampleThumbnail, "800x600")}
 									alt={`${m.makeDisplay} ${m.modelDisplay}`}
 								/>
 							</div>

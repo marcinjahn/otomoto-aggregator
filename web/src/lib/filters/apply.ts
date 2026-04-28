@@ -37,6 +37,7 @@ export function applyFilters(
     if (!inSet(o.fuelType, f.fuelTypes)) continue;
     if (!inSet(o.gearbox, f.gearboxes)) continue;
     if (!inSet(o.region, f.regions)) continue;
+    if (f.sources.size > 0 && !f.sources.has(o.source)) continue;
     if (!inAnyRange(o.priceAmount, f.priceRanges)) continue;
     if (!inAnyRange(o.year, f.yearRanges)) continue;
     if (!inAnyRange(o.mileageKm, f.mileageRanges)) continue;

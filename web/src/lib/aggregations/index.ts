@@ -1,5 +1,6 @@
 import { byModel } from "./by-model";
 import { byFuelType, byGearbox, byMake, byRegion } from "./categorical";
+import { bySource } from "./by-source";
 import {
   mileageHistogram,
   priceHistogram,
@@ -9,7 +10,7 @@ import {
 import type { Aggregator } from "./types";
 
 export * from "./types";
-export { byModel, byFuelType, byGearbox, byMake, byRegion };
+export { byModel, byFuelType, byGearbox, byMake, byRegion, bySource };
 export { priceHistogram, yearHistogram, mileageHistogram, priceOverall };
 
 /** Built-in aggregators in recommended display order. Register new ones here. */
@@ -23,4 +24,5 @@ export const AGGREGATORS: readonly Aggregator<unknown>[] = [
   byFuelType,
   byGearbox,
   byRegion,
+  bySource,
 ] as const;

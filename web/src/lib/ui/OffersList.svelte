@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { Offer } from "$lib/scraper/types";
-	import { formatInt, formatKm, formatMoney } from "./format";
-	import { otomotoSrcSet, resizeOtomotoImage } from "./image";
+	import { getProvider } from "$lib/providers/registry";
+	import { filterLabel } from "$lib/filter-compat/resolver";
+	import { formatInt, formatKm, formatMoney, formatRelativeTime } from "./format";
+	import { olxCdnSrcSet, resizeOlxCdnImage } from "./image";
 
 	let {
 		offers,
@@ -50,13 +52,13 @@
 
 <div class="flex flex-col">
 	<div class="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-neutral-200 bg-white/90 px-3 py-2 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/90">
-		<p class="truncate text-sm text-neutral-600 dark:text-neutral-400">
+		<p class="min-w-0 flex-1 truncate text-sm text-neutral-600 dark:text-neutral-400">
 			<span class="font-semibold text-neutral-900 dark:text-neutral-100">
 				{formatInt(offers.length)}
 			</span>
 			/ {formatInt(totalUnfiltered)}
 		</p>
-		<label class="flex items-center gap-1 text-xs">
+		<label class="flex shrink-0 items-center gap-1 text-xs">
 			<span class="hidden text-neutral-500 sm:inline">Sortuj</span>
 			<select
 				bind:value={sort}
@@ -75,6 +77,8 @@
 	<ul class="divide-y divide-neutral-200 dark:divide-neutral-800">
 		{#each sorted as o (o.id)}
 			{@const thumb = o.thumbnailLarge ?? o.thumbnailSmall}
+			{@const provider = getProvider(o.source)}
+			{@const added = formatRelativeTime(o.createdAt)}
 			<li>
 				<a
 					href={o.url}
@@ -82,11 +86,11 @@
 					rel="noopener noreferrer"
 					class="flex gap-3 p-3 transition hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
 				>
-					<div class="h-20 w-28 shrink-0 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 sm:h-32 sm:w-48">
+					<div class="relative h-20 w-28 shrink-0 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 sm:h-32 sm:w-48">
 						{#if thumb}
 							<img
-								src={resizeOtomotoImage(thumb, "480x360")!}
-								srcset={otomotoSrcSet(thumb) ?? undefined}
+								src={resizeOlxCdnImage(thumb, "480x360")!}
+								srcset={olxCdnSrcSet(thumb) ?? undefined}
 								sizes="(min-width: 640px) 12rem, 10rem"
 								alt={o.title}
 								loading="lazy"
@@ -94,17 +98,29 @@
 								class="h-full w-full object-cover"
 							/>
 						{/if}
+						<span
+							class="absolute right-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white shadow-sm"
+							style:background-color={o.source === "otomoto" ? "#ed1c24" : "#002f34"}
+							title={provider.label}
+						>
+							{provider.badgeText}
+						</span>
+						{#if o.droppedFilters && o.droppedFilters.length > 0}
+							<span
+								class="absolute bottom-1 left-1 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-white shadow-sm"
+								title={`Pominięte filtry: ${o.droppedFilters.map(filterLabel).join(", ")}`}
+							>
+								warunki niepełne
+							</span>
+						{/if}
 					</div>
 					<div class="min-w-0 flex-1">
 						<div class="flex items-start justify-between gap-3">
-							<h3 class="truncate text-sm font-medium">{o.title}</h3>
+							<h3 class="min-w-0 flex-1 truncate text-sm font-medium">{o.title}</h3>
 							<span class="shrink-0 text-sm font-semibold tabular-nums">
 								{formatMoney(o.priceAmount, o.priceCurrency)}
 							</span>
 						</div>
-						<p class="truncate text-xs text-neutral-600 dark:text-neutral-400">
-							{o.shortDescription ?? ""}
-						</p>
 						<dl class="mt-0.5 flex flex-wrap gap-x-3 gap-y-0 text-[11px] text-neutral-500">
 							{#if o.year}<span>{o.year}</span>{/if}
 							{#if o.mileageKm != null}<span>{formatKm(o.mileageKm)}</span>{/if}
@@ -112,6 +128,7 @@
 							{#if o.gearboxDisplay}<span>{o.gearboxDisplay}</span>{/if}
 							{#if o.enginePowerHp}<span>{o.enginePowerHp} KM</span>{/if}
 							{#if o.city}<span>{o.city}{o.region ? `, ${o.region}` : ""}</span>{/if}
+							{#if added}<span>{added}</span>{/if}
 						</dl>
 					</div>
 				</a>

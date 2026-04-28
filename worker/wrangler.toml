@@ -8,4 +8,4 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ALLOWED_ORIGINS = "https://marcinjahn.github.io"
 # Comma-separated hostnames that the worker is permitted to fetch from.
-TARGET_HOSTS = "www.otomoto.pl,otomoto.pl"
+TARGET_HOSTS = "www.otomoto.pl,otomoto.pl,www.olx.pl,olx.pl"

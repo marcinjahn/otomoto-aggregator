@@ -1,9 +1,10 @@
 /**
- * Otomoto image URLs embed a size segment like `;s=320x240`. The CDN happily
- * serves larger sizes (up to ~1400x1050), so we rewrite the segment when we
- * need a crisper image than the scraper returned.
+ * olxcdn-family hosts (`*.olxcdn.com`, including otomoto's CDN and olx's
+ * `ireland.apollo.olxcdn.com`) embed a size segment like `;s=320x240` in the
+ * URL. The CDN happily serves larger sizes (up to ~1400x1050), so we rewrite
+ * the segment when we need a crisper image than the scraper returned.
  */
-export function resizeOtomotoImage(
+export function resizeOlxCdnImage(
   url: string | null | undefined,
   size: `${number}x${number}`,
 ): string | null {
@@ -15,9 +16,9 @@ export function resizeOtomotoImage(
 /**
  * Build a srcset with multiple widths so the browser picks the best match for
  * the device pixel ratio. The height is scaled proportionally to 3:4 aspect
- * (otomoto's native ratio).
+ * (otomoto's native ratio; olx photos display fine at the same ratio).
  */
-export function otomotoSrcSet(
+export function olxCdnSrcSet(
   url: string | null | undefined,
   widths: number[] = [320, 480, 640, 960],
 ): string | null {

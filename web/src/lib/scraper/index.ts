@@ -38,6 +38,12 @@ export async function scrape(
   const maxPages = opts.maxPages ?? DEFAULT_MAX_PAGES;
   const concurrency = Math.max(1, opts.concurrency ?? DEFAULT_CONCURRENCY);
 
+  // Otomoto's default sort weights promoted/bumped offers, and that ordering
+  // shifts between requests — items slide across page boundaries, producing
+  // dupes and dropping unique offers. Forcing a deterministic sort makes
+  // pagination stable and we recover the full totalCount.
+  searchUrl = withStableOrder(searchUrl);
+
   const first = await fetchPage(searchUrl, 1, opts);
   const totalPages = Math.max(
     1,
@@ -168,5 +174,13 @@ export function withPage(searchUrl: string, page: number): string {
   const u = new URL(searchUrl);
   if (page <= 1) u.searchParams.delete("page");
   else u.searchParams.set("page", String(page));
+  return u.toString();
+}
+
+function withStableOrder(searchUrl: string): string {
+  const u = new URL(searchUrl);
+  if (!u.searchParams.has("search[order]")) {
+    u.searchParams.set("search[order]", "created_at_first:desc");
+  }
   return u.toString();
 }

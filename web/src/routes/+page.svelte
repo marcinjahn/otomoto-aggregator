@@ -47,7 +47,15 @@
 	import { appliedFilterChips } from "$lib/otomoto-filters/applied-chips";
 	import { replaceState } from "$app/navigation";
 	import { page } from "$app/state";
-	import { onMount } from "svelte";
+
+	// Landing on a shared link pre-populates the filter form but does NOT
+	// auto-scrape — the user can tweak before submitting. Parse synchronously so
+	// SearchForm sees the populated state on its first mount (its internal state
+	// is seeded from `initial` once and does not react to later prop changes).
+	const initialFormState: SearchFormState = (() => {
+		const q = page.url.searchParams.get("q");
+		return q ? parseOtomotoUrl(q) : emptyForm();
+	})();
 
 	let url = $state("");
 	let running = $state(false);
@@ -59,18 +67,9 @@
 	let filters = $state<FilterState>(emptyFilters());
 	let mobileFiltersOpen = $state(false);
 	let showUrlFallback = $state(false);
-	let formState = $state<SearchFormState>(emptyForm());
+	let formState = $state<SearchFormState>(initialFormState);
 	let searchUrl = $state<string | null>(null);
 	let controller: AbortController | null = null;
-
-	onMount(() => {
-		const params = new URLSearchParams(window.location.search);
-		const q = params.get("q");
-		if (!q) return;
-		// Landing on a shared link pre-populates the filter form but does NOT
-		// auto-scrape — the user can tweak before submitting.
-		formState = parseOtomotoUrl(q);
-	});
 
 	function syncPageUrl(targetUrl: string | null) {
 		if (typeof window === "undefined") return;

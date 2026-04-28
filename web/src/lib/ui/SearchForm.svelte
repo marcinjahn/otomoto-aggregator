@@ -48,14 +48,11 @@
 		return out;
 	}
 
-	const mileageRange = FILTERS.ranges["filter_float_mileage"]!;
 	const priceSteps = $derived(uniformSteps(0, 300000, 1000));
 	const yearSteps = $derived(
 		FILTERS.ranges["filter_float_year"]!.suggestions.filter((y) => y >= 1990),
 	);
-	const mileageSteps = $derived(
-		uniformSteps(mileageRange.min, mileageRange.max, 5000),
-	);
+	const mileageSteps = $derived(uniformSteps(5000, 500000, 5000));
 	const capacitySteps = $derived(
 		FILTERS.ranges["filter_float_engine_capacity"]!.suggestions,
 	);

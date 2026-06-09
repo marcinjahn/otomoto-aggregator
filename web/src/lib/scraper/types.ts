@@ -9,6 +9,12 @@ export interface Offer {
   url: string;
   priceAmount: number | null;
   priceCurrency: string | null;
+  /**
+   * Seller can issue a full (deductible) VAT invoice — otomoto's "Faktura VAT".
+   * Detected from the listing node's `price.badges` containing `INVOICE_ISSUED`.
+   * VAT-marża offers do NOT set this. olx never exposes it, so it stays false.
+   */
+  vatInvoice: boolean;
   city: string | null;
   region: string | null;
   thumbnailSmall: string | null;

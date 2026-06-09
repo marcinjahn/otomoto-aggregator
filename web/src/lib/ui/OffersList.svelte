@@ -23,6 +23,19 @@
 
 	let sort = $state<SortKey>("price-asc");
 
+	// Half of the 23% VAT rate — Poland's deduction cap for passenger cars.
+	const VAT_DEDUCTION = 0.115;
+
+	// When on, "Faktura VAT" offers are priced/sorted with the deducted amount.
+	let vatMode = $state(false);
+
+	function effectivePrice(o: Offer): number | null {
+		if (o.priceAmount == null) return null;
+		return vatMode && o.vatInvoice
+			? Math.round(o.priceAmount * (1 - VAT_DEDUCTION))
+			: o.priceAmount;
+	}
+
 	function cmpNum(a: number | null, b: number | null, dir: 1 | -1): number {
 		const av = a ?? (dir === 1 ? Infinity : -Infinity);
 		const bv = b ?? (dir === 1 ? Infinity : -Infinity);
@@ -33,9 +46,9 @@
 		const copy = [...offers];
 		switch (sort) {
 			case "price-asc":
-				return copy.sort((a, b) => cmpNum(a.priceAmount, b.priceAmount, 1));
+				return copy.sort((a, b) => cmpNum(effectivePrice(a), effectivePrice(b), 1));
 			case "price-desc":
-				return copy.sort((a, b) => cmpNum(a.priceAmount, b.priceAmount, -1));
+				return copy.sort((a, b) => cmpNum(effectivePrice(a), effectivePrice(b), -1));
 			case "year-desc":
 				return copy.sort((a, b) => cmpNum(a.year, b.year, -1));
 			case "year-asc":
@@ -58,6 +71,13 @@
 			</span>
 			/ {formatInt(totalUnfiltered)}
 		</p>
+		<label
+			class="flex shrink-0 cursor-pointer items-center gap-1 text-xs"
+			title="Odlicz 50% VAT (11,5%) od ofert z fakturą VAT"
+		>
+			<input type="checkbox" bind:checked={vatMode} class="accent-emerald-600" />
+			<span class="text-neutral-600 dark:text-neutral-300">Odlicz VAT</span>
+		</label>
 		<label class="flex shrink-0 items-center gap-1 text-xs">
 			<span class="hidden text-neutral-500 sm:inline">Sortuj</span>
 			<select
@@ -117,9 +137,20 @@
 					<div class="min-w-0 flex-1">
 						<div class="flex items-start justify-between gap-3">
 							<h3 class="min-w-0 flex-1 truncate text-sm font-medium">{o.title}</h3>
-							<span class="shrink-0 text-sm font-semibold tabular-nums">
-								{formatMoney(o.priceAmount, o.priceCurrency)}
-							</span>
+							{#if vatMode && o.vatInvoice && o.priceAmount != null}
+								<span class="shrink-0 text-right leading-tight">
+									<span class="block text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-500">
+										{formatMoney(effectivePrice(o), o.priceCurrency)}
+									</span>
+									<span class="block text-[11px] text-neutral-400 tabular-nums line-through">
+										{formatMoney(o.priceAmount, o.priceCurrency)}
+									</span>
+								</span>
+							{:else}
+								<span class="shrink-0 text-sm font-semibold tabular-nums">
+									{formatMoney(o.priceAmount, o.priceCurrency)}
+								</span>
+							{/if}
 						</div>
 						<dl class="mt-0.5 flex flex-wrap gap-x-3 gap-y-0 text-[11px] text-neutral-500">
 							{#if o.year}<span>{o.year}</span>{/if}
@@ -129,6 +160,9 @@
 							{#if o.enginePowerHp}<span>{o.enginePowerHp} KM</span>{/if}
 							{#if o.city}<span>{o.city}{o.region ? `, ${o.region}` : ""}</span>{/if}
 							{#if added}<span>{added}</span>{/if}
+							{#if o.vatInvoice}
+								<span class="font-medium text-emerald-600 dark:text-emerald-500">Faktura VAT</span>
+							{/if}
 						</dl>
 					</div>
 				</a>

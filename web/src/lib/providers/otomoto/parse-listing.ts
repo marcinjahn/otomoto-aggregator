@@ -23,6 +23,7 @@ interface RawNode {
   createdAt?: string | null;
   price?: {
     amount?: { units?: number; currencyCode?: string };
+    badges?: string[];
   } | null;
   location?: {
     city?: { name?: string } | null;
@@ -97,6 +98,7 @@ function nodeToOffer(node: RawNode): Offer {
     url: node.url,
     priceAmount: typeof priceUnits === "number" ? priceUnits : null,
     priceCurrency,
+    vatInvoice: (node.price?.badges ?? []).includes("INVOICE_ISSUED"),
     city: node.location?.city?.name ?? null,
     region: node.location?.region?.name ?? null,
     thumbnailSmall: node.thumbnail?.x1 ?? null,

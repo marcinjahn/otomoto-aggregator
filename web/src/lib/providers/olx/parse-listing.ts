@@ -111,6 +111,7 @@ function adToOffer(ad: RawAd, categories: Record<string, RawCategory>): Offer {
         ? ad.price.regularPrice.value
         : null,
     priceCurrency: ad.price?.regularPrice?.currencyCode ?? null,
+    vatInvoice: false,
     city: ad.location?.cityName ?? null,
     region: ad.location?.regionName ?? null,
     thumbnailSmall: photo,

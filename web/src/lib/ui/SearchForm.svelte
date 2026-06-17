@@ -68,9 +68,7 @@
 		FILTERS.ranges["filter_float_year"]!.suggestions.filter((y) => y >= 1990),
 	);
 	const mileageSteps = $derived(uniformSteps(5000, 500000, 5000));
-	const capacitySteps = $derived(
-		FILTERS.ranges["filter_float_engine_capacity"]!.suggestions,
-	);
+	const capacitySteps = $derived(uniformSteps(50, 6000, 100));
 	const powerSteps = $derived(
 		FILTERS.ranges["filter_float_engine_power"]!.suggestions,
 	);
